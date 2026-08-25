@@ -1,0 +1,22 @@
+# --- Python (etl/) ---
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# --- Node (server/) ---
+node_modules/
+
+# --- 构建产物与工作目录(大文件,永不入库) ---
+etl/work/
+etl/work-alias/
+etl/dist/
+etl/dist-*/
+etl/dist-full/
+server/.wrangler/
+server/dist/
+.wrangler/
+
+# --- 系统 ---
+.DS_Store

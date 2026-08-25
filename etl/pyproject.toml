@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "poetry-mate-etl"
+version = "0.1.0"
+description = "Poetry Mate 数据管道：chinese-poetry 原始数据 → 标准化分卷"
+requires-python = ">=3.14"
+dependencies = [
+    # OpenCC 版本是诗词 ID 契约的组成部分（见 specs/poem-id），升级必须走变更流程
+    "opencc-python-reimplemented==0.1.7",
+    "requests==2.32.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+]
+
+[tool.setuptools]
+packages = ["poetry_etl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,214 @@
+# Poetry Mate ETL 构建与发布流水线
+#
+# 触发:
+#   - 手动(workflow_dispatch): 可指定上游 commit / 是否发布 / 是否做别名比对
+#   - 每周一 UTC 03:00 定时检查上游更新并构建发布
+#
+# 前置 secrets(仅 publish 需要):
+#   CLOUDFLARE_API_TOKEN   —— 需 R2 读写权限,绑定到目标 bucket 所在账号
+#   CLOUDFLARE_ACCOUNT_ID  —— 账号 ID(wrangler 运行时用)
+#
+# 安全边界: 本流水线不含任何 LLM 相关流程;R2 写入只发生在本文件的发布作业中。
+
+name: etl-build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_commit:
+        description: "上游 chinese-poetry commit sha(留空=取 master 最新)"
+        required: false
+        default: ""
+      publish:
+        description: "构建通过后发布到 R2"
+        type: boolean
+        default: true
+      diff_aliases:
+        description: "与线上当前版本做别名比对(--prev)"
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 3 * * 1"
+
+concurrency:
+  group: etl-build
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REPO: chinese-poetry/chinese-poetry
+  BUCKET: poetry-mate-data
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      issues: ${{ steps.build.outputs.issues }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: etl/pyproject.toml
+
+      # 解析上游 commit(显式输入优先;否则走 API,GITHUB_TOKEN 限额远高于匿名)
+      - name: Resolve upstream commit
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_COMMIT: ${{ inputs.upstream_commit }}
+        run: |
+          if [[ -n "$INPUT_COMMIT" ]]; then
+            echo "commit=$INPUT_COMMIT" >> "$GITHUB_OUTPUT"
+          else
+            COMMIT=$(curl -sf \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${UPSTREAM_REPO}/commits/master" \
+              | python3 -c "import json,sys; print(json.load(sys.stdin)['sha'])")
+            echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          fi
+
+      # 发布模式下取回线上当前版本,供别名比对(--prev);失败不阻断(退化为首次语义)
+      - name: Fetch previous version from R2 (for alias diff)
+        if: ${{ inputs.diff_aliases != false && inputs.publish != false }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: server
+        run: |
+          set -euo pipefail
+          npm ci --silent
+          mkdir -p prev
+          if ! npx wrangler r2 object get "${BUCKET}/current" --file prev-current.json --remote 2>/dev/null; then
+            echo "线上尚无 current 指针,按首次构建处理"
+            exit 0
+          fi
+          PREV=$(python3 -c "import json;print(json.load(open('prev-current.json'))['version'])")
+          echo "上一版: $PREV"
+          mkdir -p "prev/$PREV"
+          npx wrangler r2 object get "${BUCKET}/$PREV/manifest.json" \
+            --file "prev/$PREV/manifest.json" --remote
+          python3 - "$PREV" <<'PY'
+          import json, pathlib, sys
+          manifest = json.loads(pathlib.Path(sys.argv[1] + "/manifest.json").read_text())
+          files = ["manifest.json"]
+          for entry in manifest["collections"].values():
+              files += [v["file"] for v in entry["volumes"]]
+          pathlib.Path("prev-filelist.txt").write_text("\n".join(files))
+          PY
+          while IFS= read -r rel; do
+            npx wrangler r2 object get "${BUCKET}/${PREV}/${rel}" \
+              --file "prev/$PREV/$rel" --remote >/dev/null
+          done < prev-filelist.txt
+          echo "PREV_DIR=${GITHUB_WORKSPACE}/server/prev/$PREV" >> "$GITHUB_ENV"
+
+      - name: Install ETL
+        working-directory: etl
+        run: make install
+
+      - name: Build
+        id: build
+        working-directory: etl
+        env:
+          COMMIT: ${{ steps.upstream.outputs.commit }}
+          PREV_DIR: ${{ env.PREV_DIR }}
+        run: |
+          set -euo pipefail
+          ARGS=(--commit "$COMMIT" --out dist-full)
+          if [[ -n "${PREV_DIR:-}" && -d "${PREV_DIR}/volumes" ]]; then
+            ARGS+=(--prev "$PREV_DIR")
+          fi
+          .venv/bin/python -m poetry_etl build "${ARGS[@]}"
+          VERSION=$(ls dist-full | head -1)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          ISSUES=$(python3 -c "
+          import json,pathlib
+          p=pathlib.Path('dist-full')/VERSION/'build-issues.json'
+          print(len(json.loads(p.read_text())))
+          ")
+          echo "issues=$ISSUES" >> "$GITHUB_OUTPUT"
+
+      - name: Spot check (20 篇名篇回归)
+        working-directory: etl
+        run: |
+          .venv/bin/python -m poetry_etl.spotcheck \
+            --dir "dist-full/${{ steps.build.outputs.version }}"
+
+      # 门禁已在 build 内自动执行过;此处显式重跑一次以独立的失败信号
+      - name: Gate
+        working-directory: etl
+        run: .venv/bin/python -m poetry_etl gate --dir "dist-full/${{ steps.build.outputs.version }}"
+
+      - name: Summarize
+        if: always()
+        working-directory: etl
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          if [[ -n "$VERSION" && -d "dist-full/$VERSION" ]]; then
+            .venv/bin/python summarize.py "dist-full/$VERSION" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## ETL 构建失败(无产物)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload artifacts (含失败现场)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ steps.build.outputs.version || 'failed' }}
+          path: |
+            etl/dist-full/
+            etl/work/*.log
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Report failure as issue (pending-review 不静默吞掉)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          TITLE="[etl] 构建失败 ${VERSION:-$(date -u +%F)}"
+          BODY="构建失败于 [${GITHUB_RUN_ID}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})。请查看日志与产物 artifact(dist-* 含 work 日志与部分产物)。"
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number -q '.[0].number' || true)
+          if [[ -n "$EXISTING" ]]; then
+            gh issue comment "$EXISTING" --body "再次失败: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label ci-failure || \
+              gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+  publish:
+    needs: build
+    if: ${{ inputs.publish != false && success() }}
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.build.outputs.version }}
+          path: artifact
+
+      - name: Publish to R2 + switch current pointer
+        working-directory: server
+        run: |
+          set -euo pipefail
+          npm ci --silent
+          VERSION_DIR="$(find ../artifact/etl/dist-full -maxdepth 1 -type d -name 'v*' | head -1)"
+          [[ -n "$VERSION_DIR" ]] || { echo "找不到版本目录" >&2; exit 1; }
+          chmod +x scripts/upload-version.sh
+          ./scripts/upload-version.sh "$VERSION_DIR" "$BUCKET"

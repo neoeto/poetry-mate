@@ -1,0 +1,17 @@
+# Poetry Mate 数据分发服务配置
+# 契约来源: ../openspec/changes/build-data-pipeline/specs/data-distribution-api/
+#
+# 部署前必改项(见 README 部署清单):
+#   - bucket_name: 换成你自己的 R2 bucket 名
+#   - routes: 绑定自定义域名(workers.dev 国内可达性差,仅作备份通道)
+
+name = "poetry-mate-data"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[[r2_buckets]]
+binding = "DATA"
+bucket_name = "poetry-mate-data"
+
+[observability]
+enabled = true
