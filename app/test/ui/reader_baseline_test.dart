@@ -3,16 +3,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/ui/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:poetry_mate/data/preferences/reading_prefs.dart';
+import 'package:poetry_mate/data/providers.dart';
 import 'package:poetry_mate/features/reader/reader_page.dart';
 
 import '../data/fixtures.dart';
 
 void main() {
-  Future<void> pumpReader(WidgetTester tester, dynamic poem) async {
+  Future<void> pumpReader(WidgetTester tester, dynamic poem,
+      {ReadingPrefs? prefs}) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(body: ReaderPage(poem: poem)),
+      ProviderScope(
+        overrides: [
+          readingPrefsProvider.overrideWithValue(
+              prefs ?? InMemoryReadingPrefs()),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: ReaderPage(poem: poem)),
+        ),
       ),
     );
     await tester.pumpAndSettle();

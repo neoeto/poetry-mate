@@ -43,7 +43,6 @@ class AnnotationService {
       kind: NotebookKind.lineNote,
       target: target,
     );
-
     if (existing != null && !forceRegenerate) {
       return LineNoteContent.tryParse(
               jsonEncode(existing.content)) ??
@@ -61,19 +60,15 @@ class AnnotationService {
       poemBody: poem.bodyText,
       metaLine: '${poem.author} · ${poem.dynasty}',
     );
-
     final line = poem.paragraphs[lineIndex];
-    final raw = await _completeWithRetry(
+    final parsed = await _completeAndParse<LineNoteContent>(
       systemPrompt: systemPrompt,
       userPrompt:
           '【诗】${poem.bodyText}\n\n请针对第 ${lineIndex + 1} 行「$line」：\n'
           '给出整句白话直译(translation)，以及关键词注(notes 数组，'
           '每项 {term, explain})。只输出 JSON 对象。',
+      parse: LineNoteContent.tryParse,
     );
-    final parsed = LineNoteContent.tryParse(raw);
-    if (parsed == null) {
-      throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
-    }
 
     final id = notebookEntryId(
       poemId: poem.id,
@@ -124,7 +119,7 @@ class AnnotationService {
       metaLine: '${poem.author} · ${poem.dynasty}',
     );
 
-    final raw = await _completeWithRetry(
+    final parsed = await _completeAndParse<EssayContent>(
       systemPrompt: systemPrompt,
       userPrompt: '【诗】${poem.author}《${poem.displayTitle}》\n'
           '${poem.bodyText}\n\n请输出整篇赏析 JSON：\n'
@@ -134,11 +129,8 @@ class AnnotationService {
           ' "mood": "意境与情感",\n'
           ' "background": {"text": "创作背景", "uncertain": true|false}\n'
           '}\n背景与典故无把握时 text 留空且 uncertain=true。',
+      parse: EssayContent.tryParse,
     );
-    final parsed = EssayContent.tryParse(raw);
-    if (parsed == null) {
-      throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
-    }
 
     final id = notebookEntryId(poemId: poem.id, kind: NotebookKind.essay);
     final now = DateTime.now();
@@ -156,27 +148,41 @@ class AnnotationService {
     return parsed;
   }
 
-  /// 解析失败自动重试一次(附格式纠正提示)
-  Future<String> _completeWithRetry({
+  /// 解析失败自动重试一次(附格式纠正提示)。
+  ///
+  /// LLM 客户端自身的响应结构错误和业务 JSON 解析错误都走同一重试
+  /// 路径，避免供应商虽返回 2xx、但内容带说明文字时提前放弃。
+  Future<T> _completeAndParse<T>({
     required String systemPrompt,
     required String userPrompt,
+    required T? Function(String raw) parse,
   }) async {
-    try {
-      return await _llm.complete([
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final messages = <LlmMessage>[
         LlmMessage('system', systemPrompt),
         LlmMessage('user', userPrompt),
-      ], jsonMode: true);
-    } on LlmException catch (e) {
-      if (e.kind != LlmErrorKind.badResponse) rethrow;
-      return await _llm.complete([
-        LlmMessage('system', systemPrompt),
-        LlmMessage('user', userPrompt),
-        LlmMessage(
-            'assistant', '(上次输出无法解析为 JSON)'),
-        LlmMessage('user',
-            '上一次输出不是合法 JSON。请重新回答，只输出一个合法 JSON 对象，不要任何其他文字。'),
-      ], jsonMode: true);
+      ];
+      if (attempt == 1) {
+        messages.addAll([
+          const LlmMessage('assistant', '(上次输出无法解析为 JSON)'),
+          const LlmMessage(
+              'user', '上一次输出不是合法 JSON。请重新回答，只输出一个合法 JSON 对象，不要任何其他文字。'),
+        ]);
+      }
+
+      String raw;
+      try {
+        raw = await _llm.complete(messages, jsonMode: true);
+      } on LlmException catch (e) {
+        if (e.kind != LlmErrorKind.badResponse || attempt == 1) rethrow;
+        continue;
+      }
+
+      final parsed = parse(raw);
+      if (parsed != null) return parsed;
     }
+
+    throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
   }
 }
 

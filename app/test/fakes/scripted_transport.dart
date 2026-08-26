@@ -59,6 +59,7 @@ class ScriptedTransport implements LlmTransport {
     lastUrl = url;
     lastHeaders = headers;
     lastBody = body;
+    callCount++;
     final status = statusError;
     if (status != null) {
       throw statusToError(status, errorBody);

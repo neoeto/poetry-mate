@@ -197,6 +197,7 @@ void main() {
             .having((e) => e.kind, 'kind', LlmErrorKind.badResponse)),
       );
 
+      expect(transport.callCount, 2);
       expect(await notebookRepo.byPoem(poem.id), isEmpty);
     });
   });

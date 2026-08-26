@@ -4,12 +4,15 @@
 /// 从而整棵 widget 树(Full App)可在无平台通道下测试。
 
 library;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/db/app_database.dart';
 import '../features/browse/browse_filters.dart';
 import '../domain/entities/poem.dart';
+import '../core/llm/annotation_service.dart';
 import '../core/llm/llm_providers.dart';
+import '../core/llm/persona.dart';
 import 'preferences/reading_prefs.dart';
 import 'repositories/favorites_repository.dart';
 import 'repositories/notebook_repository.dart';
@@ -57,3 +60,26 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>(
 
 final readingPrefsProvider =
     Provider<ReadingPrefs>((ref) => SharedReadingPrefs(ref.watch(sharedPreferencesAsyncProvider)));
+
+/// 收藏状态(阅读页心形);切换后 invalidate 刷新
+final isFavoriteProvider =
+    FutureProvider.autoDispose.family<bool, String>((ref, poemId) {
+  return ref.watch(favoritesRepositoryProvider).isFavorite(poemId);
+});
+
+/// 人格模板服务(生产使用随包 rootBundle,测试可 override)
+final personaServiceProvider = Provider<PersonaService>((ref) {
+  return PersonaService(
+    assets: rootBundle,
+    prefs: ref.watch(prefsStoreProvider),
+  );
+});
+
+/// 三层赏析服务(仓库、LLM 客户端和人格模板统一装配)
+final annotationServiceProvider = Provider<AnnotationService>((ref) {
+  return AnnotationService(
+    notebookRepository: ref.watch(notebookRepositoryProvider),
+    llmClient: ref.watch(llmClientProvider),
+    personaService: ref.watch(personaServiceProvider),
+  );
+});

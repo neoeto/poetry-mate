@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/mappers/poem_mapper.dart';
+import 'package:poetry_mate/data/preferences/reading_prefs.dart';
 import 'package:poetry_mate/data/providers.dart';
 import 'package:poetry_mate/main.dart';
 
@@ -42,7 +43,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          readingPrefsProvider.overrideWithValue(InMemoryReadingPrefs()),
+        ],
         child: const PoetryMateApp(),
       ),
     );
@@ -72,7 +76,10 @@ void main() {
   testWidgets('空库启动: 分类页显示空态而非崩溃', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          readingPrefsProvider.overrideWithValue(InMemoryReadingPrefs()),
+        ],
         child: const PoetryMateApp(),
       ),
     );
