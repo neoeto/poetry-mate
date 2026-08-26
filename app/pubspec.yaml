@@ -35,6 +35,13 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
+  # 霞鹜文楷 GB 语料子集(15,069 字形, 覆盖出货文本+原文; 扩展B/F罕见变体走系统回退)
+  # 再生成方法见 etl/docs/font-charset.txt 同目录说明
+  fonts:
+    - family: LXGW WenKai GB
+      fonts:
+        - asset: assets/fonts/LXGWWenKaiGB-Regular.ttf
+
   assets:
     - assets/seed/
     - assets/personas/
