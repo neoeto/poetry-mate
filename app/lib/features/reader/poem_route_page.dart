@@ -3,9 +3,11 @@
 library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/preferences/reading_settings_controller.dart';
 import '../../data/providers.dart';
+import 'chat_sheet.dart';
 import 'reader_page.dart';
 
 class PoemRoutePage extends ConsumerWidget {
@@ -18,10 +20,24 @@ class PoemRoutePage extends ConsumerWidget {
     final poemAsync = ref.watch(poemByIdProvider(poemId));
     final favoriteAsync = ref.watch(isFavoriteProvider(poemId));
     final plainText = ref.watch(readingSettingsProvider).plainText;
+    final poem = poemAsync.value;
 
     return Scaffold(
       appBar: AppBar(
         actions: [
+          if (poem != null)
+            IconButton(
+              tooltip: '问 AI',
+              onPressed: () => showChatSheet(
+                context,
+                poem: poem,
+                onOpenSettings: () {
+                  Navigator.of(context).pop();
+                  context.push('/settings/llm');
+                },
+              ),
+              icon: const Icon(Icons.chat_bubble_outline),
+            ),
           // ── 白文模式开关 ──
           IconButton(
             tooltip: plainText ? '显示标点' : '白文模式',

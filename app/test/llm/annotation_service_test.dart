@@ -204,6 +204,45 @@ void main() {
       expect(await notebookRepo.byPoem(poem.id), isEmpty);
     });
   });
+
+  group('L3 追问对话', () {
+    test('SSE 按增量返回并携带诗全文上下文，完成后写入 chat_turn', () async {
+      final poem = testPoem(paragraphs: ['床前明月光，']);
+      transport.sseText = 'data: {"choices":[{"delta":{"content":"先看"} }]}\n'
+          'data: {"choices":[{"delta":{"content":"这一句"} }]}\n'
+          'data: [DONE]\n';
+
+      final deltas = await service.streamQuestion(poem, '这个字有什么意味？').toList();
+
+      expect(deltas.map((delta) => delta.text), ['先看', '这一句']);
+      expect(deltas.every((delta) => !delta.replace), isTrue);
+      final messages = transport.lastBody['messages'] as List;
+      final userPrompt = (messages.last as Map)['content'] as String;
+      expect(userPrompt, contains(poem.bodyText));
+      expect(userPrompt, contains('这个字有什么意味？'));
+      final entries = await notebookRepo.byPoem(poem.id);
+      expect(entries.single.kind, NotebookKind.chatTurn);
+      expect(entries.single.content['answer'], '先看这一句');
+    });
+
+    test('SSE 失败降级一次性回答，并用 replace 增量替换标记', () async {
+      final poem = testPoem(paragraphs: ['床前明月光，']);
+      transport.streamStatusError = 503;
+      transport.jsonResult = {
+        'choices': [
+          {'message': {'content': '这是一次性回答'}}
+        ],
+      };
+
+      final deltas = await service.streamQuestion(poem, '请换一种说法').toList();
+
+      expect(deltas.single.text, '这是一次性回答');
+      expect(deltas.single.replace, isTrue);
+      expect(transport.callCount, 2); // stream + complete
+      final entries = await notebookRepo.byPoem(poem.id);
+      expect(entries.single.content['answer'], '这是一次性回答');
+    });
+  });
 }
 
 class _StaticSecure implements SecureKeyStore {

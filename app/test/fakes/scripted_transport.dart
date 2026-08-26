@@ -19,8 +19,11 @@ class ScriptedTransport implements LlmTransport {
   /// postJson 返回的响应体
   Map<String, dynamic>? jsonResult;
 
-  /// 非 null 时 postJson/postStream 抛此状态码错误
+  /// 非 null 时 postJson 抛此状态码错误
   int? statusError;
+
+  /// 非 null 时 postStream 抛此状态码错误(用于测试一次性降级)
+  int? streamStatusError;
   String errorBody = '{"error":{"message":"boom"}}';
 
   /// postStream 吐出的 SSE 文本(按行)
@@ -60,7 +63,7 @@ class ScriptedTransport implements LlmTransport {
     lastHeaders = headers;
     lastBody = body;
     callCount++;
-    final status = statusError;
+    final status = streamStatusError ?? statusError;
     if (status != null) {
       throw statusToError(status, errorBody);
     }

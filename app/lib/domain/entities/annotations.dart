@@ -214,3 +214,37 @@ class EssayContent {
         background: background ?? this.background,
       );
 }
+
+// ---------------------------------------------------------------------------
+// L3 追问对话
+// ---------------------------------------------------------------------------
+
+/// 一次对话增量。fallback 需要替换已经显示的半截流，而不是重复追加。
+class ChatDelta {
+  const ChatDelta(this.text, {this.replace = false});
+
+  final String text;
+  final bool replace;
+}
+
+class ChatTurnContent {
+  const ChatTurnContent({required this.question, required this.answer});
+
+  final String question;
+  final String answer;
+
+  Map<String, dynamic> toJson() => {
+        'question': question,
+        'answer': answer,
+      };
+
+  static ChatTurnContent fromJson(Map<String, dynamic> json) => ChatTurnContent(
+        question: (json['question'] ?? '').toString(),
+        answer: (json['answer'] ?? '').toString(),
+      );
+
+  static ChatTurnContent? tryParse(String raw) {
+    final decoded = tryDecodeJsonObject(raw);
+    return decoded == null ? null : fromJson(decoded);
+  }
+}

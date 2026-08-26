@@ -149,6 +149,114 @@ class AnnotationService {
     return parsed;
   }
 
+  /// L3 追问对话。
+  ///
+  /// 正常路径逐段 yield；流式连接失败或返回空内容时改用一次性补全。
+  /// fallback 通过 [ChatDelta.replace] 告诉 UI 替换半截答案，避免重复文本。
+  /// 每次完成的问答都以 chat_turn 形式写入注本。
+  Stream<ChatDelta> streamQuestion(
+    Poem poem,
+    String question, {
+    String? personaId,
+    EssayContent? essay,
+  }) async* {
+    final cleanQuestion = question.trim();
+    if (cleanQuestion.isEmpty) {
+      throw const LlmException(LlmErrorKind.badResponse, '问题不能为空');
+    }
+
+    final personaIdResolved = personaId ?? await _persona.selectedId();
+    final systemPrompt = await _persona.buildSystemPrompt(
+      personaIdResolved,
+      poemBody: poem.bodyText,
+      metaLine: '${poem.author} · ${poem.dynasty}',
+    );
+
+    final context = StringBuffer()
+      ..writeln('【本诗全文】')
+      ..writeln(poem.bodyText);
+    final cachedEssay = essay ?? await _cachedEssay(poem.id);
+    if (cachedEssay != null) {
+      context
+        ..writeln()
+        ..writeln('【已有结构化赏析】')
+        ..writeln(jsonEncode(cachedEssay.toJson()));
+    }
+    context
+      ..writeln()
+      ..writeln('【用户问题】')
+      ..write(cleanQuestion);
+
+    final messages = <LlmMessage>[
+      LlmMessage('system', systemPrompt),
+      LlmMessage('user', context.toString()),
+    ];
+    final answer = StringBuffer();
+
+    try {
+      await for (final chunk in _llm.streamChat(messages)) {
+        if (chunk.isEmpty) continue;
+        answer.write(chunk);
+        yield ChatDelta(chunk);
+      }
+      if (answer.isEmpty) {
+        throw const LlmException(LlmErrorKind.badResponse, '流式返回为空');
+      }
+    } on LlmException catch (error) {
+      if (error.kind == LlmErrorKind.noKey) rethrow;
+      final fallback = await _llm.complete(messages);
+      if (fallback.trim().isEmpty) {
+        throw const LlmException(LlmErrorKind.badResponse, '返回内容为空');
+      }
+      answer
+        ..clear()
+        ..write(fallback);
+      yield ChatDelta(fallback, replace: true);
+    } catch (_) {
+      // 兼容少数 transport 抛出的非 LlmException 网络错误。
+      final fallback = await _llm.complete(messages);
+      if (fallback.trim().isEmpty) {
+        throw const LlmException(LlmErrorKind.badResponse, '返回内容为空');
+      }
+      answer
+        ..clear()
+        ..write(fallback);
+      yield ChatDelta(fallback, replace: true);
+    }
+
+    final now = DateTime.now();
+    final target = cleanQuestion.length > 160
+        ? cleanQuestion.substring(0, 160)
+        : cleanQuestion;
+    await _notebook.upsert(NotebookEntry(
+      id: notebookEntryId(
+        poemId: poem.id,
+        kind: NotebookKind.chatTurn,
+        target: '${now.microsecondsSinceEpoch}|$target',
+      ),
+      poemId: poem.id,
+      kind: NotebookKind.chatTurn,
+      target: target,
+      content: ChatTurnContent(
+        question: cleanQuestion,
+        answer: answer.toString(),
+      ).toJson(),
+      persona: personaIdResolved,
+      userEdited: false,
+      createdAt: now,
+      updatedAt: now,
+    ));
+  }
+
+  Future<EssayContent?> _cachedEssay(String poemId) async {
+    final entry = await _notebook.byTarget(
+      poemId: poemId,
+      kind: NotebookKind.essay,
+    );
+    if (entry == null) return null;
+    return EssayContent.tryParse(jsonEncode(entry.content));
+  }
+
   /// 解析失败自动重试一次(附格式纠正提示)。
   ///
   /// LLM 客户端自身的响应结构错误和业务 JSON 解析错误都走同一重试
