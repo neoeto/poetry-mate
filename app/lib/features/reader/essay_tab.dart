@@ -7,10 +7,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/llm/annotation_service.dart';
 import '../../core/llm/llm_exception.dart';
 import '../../data/providers.dart';
 import '../../domain/entities/annotations.dart';
+import '../../domain/entities/notebook_entry.dart';
 import '../../domain/entities/poem.dart';
+import 'notebook_editor.dart';
 
 class EssayTab extends ConsumerStatefulWidget {
   const EssayTab({
@@ -49,6 +52,36 @@ class _EssayTabState extends ConsumerState<EssayTab>
     });
   }
 
+  Future<NotebookEntry?> _entry() {
+    return ref.read(notebookRepositoryProvider).byTarget(
+          poemId: widget.poem.id,
+          kind: NotebookKind.essay,
+        );
+  }
+
+  Future<void> _edit() async {
+    final entry = await _entry();
+    if (entry == null || !mounted) return;
+    final saved = await showNotebookEntryEditor(context, entry);
+    if (saved == true && mounted) _retry();
+  }
+
+  Future<void> _regenerate() async {
+    final entry = await _entry();
+    if (!mounted) return;
+    final confirmed = await confirmRegeneration(
+      context,
+      userEdited: entry?.userEdited ?? false,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() {
+      _essayFuture = ref.read(annotationServiceProvider).getOrCreateEssay(
+            widget.poem,
+            forceRegenerate: true,
+          );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -69,7 +102,11 @@ class _EssayTabState extends ConsumerState<EssayTab>
         if (essay == null) {
           return _EssayError(onRetry: _retry);
         }
-        return EssayContentView(content: essay);
+        return EssayContentView(
+          content: essay,
+          onEdit: _edit,
+          onRegenerate: _regenerate,
+        );
       },
     );
   }
@@ -116,15 +153,43 @@ class _EssaySkeleton extends StatelessWidget {
 }
 
 class EssayContentView extends StatelessWidget {
-  const EssayContentView({super.key, required this.content});
+  const EssayContentView({
+    super.key,
+    required this.content,
+    this.onEdit,
+    this.onRegenerate,
+  });
 
   final EssayContent content;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRegenerate;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
       children: [
+        if (onEdit != null || onRegenerate != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 4,
+              children: [
+                if (onEdit != null)
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('编辑注本'),
+                  ),
+                if (onRegenerate != null)
+                  TextButton.icon(
+                    onPressed: onRegenerate,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重新生成'),
+                  ),
+              ],
+            ),
+          ),
         _EssaySection(
           title: '大意',
           child: _EssayText(content.summary),
@@ -243,6 +308,11 @@ class _EssayError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final parseError = error;
+    if (parseError is AnnotationParseException &&
+        parseError.rawText.trim().isNotEmpty) {
+      return _EssayPlainFallback(rawText: parseError.rawText);
+    }
     final noKey = error is LlmException &&
         (error! as LlmException).kind == LlmErrorKind.noKey;
     if (noKey) {
@@ -268,6 +338,25 @@ class _EssayError extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EssayPlainFallback extends StatelessWidget {
+  const _EssayPlainFallback({required this.rawText});
+
+  final String rawText;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text('结构化解析失败，先展示模型原文',
+            style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 10),
+        SelectableText(rawText),
+      ],
     );
   }
 }

@@ -17,6 +17,14 @@ import '../../domain/entities/annotations.dart';
 import '../../domain/entities/notebook_entry.dart';
 import '../../domain/entities/poem.dart';
 
+/// 两次结构化解析均失败时携带最后一份模型原文，供 UI 纯文本降级展示。
+class AnnotationParseException extends LlmException {
+  const AnnotationParseException(this.rawText)
+      : super(LlmErrorKind.badResponse, '赏析返回格式异常，已切换为纯文本');
+
+  final String rawText;
+}
+
 class AnnotationService {
   AnnotationService({
     required NotebookRepository notebookRepository,
@@ -266,6 +274,7 @@ class AnnotationService {
     required String userPrompt,
     required T? Function(String raw) parse,
   }) async {
+    String? lastRaw;
     for (var attempt = 0; attempt < 2; attempt++) {
       final messages = <LlmMessage>[
         LlmMessage('system', systemPrompt),
@@ -282,8 +291,13 @@ class AnnotationService {
       String raw;
       try {
         raw = await _llm.complete(messages, jsonMode: true);
+        lastRaw = raw;
       } on LlmException catch (e) {
-        if (e.kind != LlmErrorKind.badResponse || attempt == 1) rethrow;
+        if (e.kind != LlmErrorKind.badResponse) rethrow;
+        if (attempt == 1 && lastRaw != null) {
+          throw AnnotationParseException(lastRaw);
+        }
+        if (attempt == 1) rethrow;
         continue;
       }
 
@@ -291,6 +305,10 @@ class AnnotationService {
       if (parsed != null) return parsed;
     }
 
+    final raw = lastRaw;
+    if (raw != null && raw.trim().isNotEmpty) {
+      throw AnnotationParseException(raw);
+    }
     throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
   }
 }

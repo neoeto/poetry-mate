@@ -86,6 +86,25 @@ void main() {
     expect(find.text('史料不详，仅供参考'), findsOneWidget);
   });
 
+  testWidgets('结构化解析失败时在赏析页降级展示模型原文', (tester) async {
+    final completer = Completer<EssayContent>();
+    final service = _FakeAnnotationService(completer.future);
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem, service);
+
+    await tester.tap(find.text('赏析'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('essay-skeleton')), findsOneWidget);
+
+    completer.completeError(
+      const AnnotationParseException('模型给出的普通文字'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('结构化解析失败，先展示模型原文'), findsOneWidget);
+    expect(find.text('模型给出的普通文字'), findsOneWidget);
+  });
+
   testWidgets('切回原文再回赏析: 同一页签实例不重复请求', (tester) async {
     final service = _FakeAnnotationService(Future.value(const EssayContent(
       summary: '大意',

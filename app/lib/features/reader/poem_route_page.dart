@@ -60,6 +60,7 @@ class PoemRoutePage extends ConsumerWidget {
                 await repo.add(poemId);
               }
               ref.invalidate(isFavoriteProvider(poemId));
+              ref.invalidate(favoriteItemsProvider);
             },
             icon: Icon(
               favoriteAsync.value == true

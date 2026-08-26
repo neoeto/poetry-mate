@@ -25,4 +25,11 @@ void main() {
     await prefs.setContentFontSize(28);
     expect(await prefs.contentFontSize(), 28);
   });
+
+  test('字号越界收敛到 20–32', () async {
+    await prefs.setContentFontSize(12);
+    expect(await prefs.contentFontSize(), kMinContentFontSize);
+    await prefs.setContentFontSize(48);
+    expect(await prefs.contentFontSize(), kMaxContentFontSize);
+  });
 }

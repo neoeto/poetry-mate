@@ -196,8 +196,9 @@ void main() {
 
       await expectLater(
         service.getOrCreateEssay(poem),
-        throwsA(isA<LlmException>()
-            .having((e) => e.kind, 'kind', LlmErrorKind.badResponse)),
+        throwsA(isA<AnnotationParseException>()
+            .having((e) => e.kind, 'kind', LlmErrorKind.badResponse)
+            .having((e) => e.rawText, 'rawText', '还不是json')),
       );
 
       expect(transport.callCount, 2);

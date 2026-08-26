@@ -67,6 +67,11 @@ final isFavoriteProvider =
   return ref.watch(favoritesRepositoryProvider).isFavorite(poemId);
 });
 
+/// 收藏页按最近收藏时间返回已关联的诗实体
+final favoriteItemsProvider = FutureProvider.autoDispose((ref) {
+  return ref.watch(favoritesRepositoryProvider).listByRecent();
+});
+
 /// 人格模板服务(生产使用随包 rootBundle,测试可 override)
 final personaServiceProvider = Provider<PersonaService>((ref) {
   return PersonaService(
@@ -82,4 +87,9 @@ final annotationServiceProvider = Provider<AnnotationService>((ref) {
     llmClient: ref.watch(llmClientProvider),
     personaService: ref.watch(personaServiceProvider),
   );
+});
+
+/// 当前 AI 人格选择(只读响应式状态)
+final personaSelectionProvider = FutureProvider.autoDispose<String>((ref) {
+  return ref.watch(personaServiceProvider).selectedId();
 });

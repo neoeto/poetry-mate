@@ -11,7 +11,9 @@ import '../../core/llm/annotation_service.dart';
 import '../../core/llm/llm_exception.dart';
 import '../../data/providers.dart';
 import '../../domain/entities/annotations.dart';
+import '../../domain/entities/notebook_entry.dart';
 import '../../domain/entities/poem.dart';
+import 'notebook_editor.dart';
 
 class LineNoteSheet extends ConsumerStatefulWidget {
   const LineNoteSheet({
@@ -50,6 +52,38 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
   void _retry() {
     setState(() {
       _noteFuture = _load();
+    });
+  }
+
+  Future<NotebookEntry?> _entry() {
+    return ref.read(notebookRepositoryProvider).byTarget(
+          poemId: widget.poem.id,
+          kind: NotebookKind.lineNote,
+          target: widget.lineIndex.toString(),
+        );
+  }
+
+  Future<void> _edit() async {
+    final entry = await _entry();
+    if (entry == null || !mounted) return;
+    final saved = await showNotebookEntryEditor(context, entry);
+    if (saved == true && mounted) _retry();
+  }
+
+  Future<void> _regenerate() async {
+    final entry = await _entry();
+    if (!mounted) return;
+    final confirmed = await confirmRegeneration(
+      context,
+      userEdited: entry?.userEdited ?? false,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() {
+      _noteFuture = ref.read(annotationServiceProvider).getOrCreateLineNote(
+            widget.poem,
+            widget.lineIndex,
+            forceRegenerate: true,
+          );
     });
   }
 
@@ -105,7 +139,11 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
                     }
                     final note = snapshot.data;
                     if (note == null) return _LineNoteError(onRetry: _retry);
-                    return _LineNoteResult(note: note);
+                    return _LineNoteResult(
+                      note: note,
+                      onEdit: _edit,
+                      onRegenerate: _regenerate,
+                    );
                   },
                 ),
               ),
@@ -139,9 +177,15 @@ class _LineNoteLoading extends StatelessWidget {
 }
 
 class _LineNoteResult extends StatelessWidget {
-  const _LineNoteResult({required this.note});
+  const _LineNoteResult({
+    required this.note,
+    required this.onEdit,
+    required this.onRegenerate,
+  });
 
   final LineNoteContent note;
+  final VoidCallback onEdit;
+  final VoidCallback onRegenerate;
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +213,22 @@ class _LineNoteResult extends StatelessWidget {
                 ),
               ),
           ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('编辑注本'),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: onRegenerate,
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新生成'),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -188,6 +248,11 @@ class _LineNoteError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final parseError = error;
+    if (parseError is AnnotationParseException &&
+        parseError.rawText.trim().isNotEmpty) {
+      return _LineNotePlainFallback(rawText: parseError.rawText);
+    }
     final noKey = error is LlmException &&
         (error! as LlmException).kind == LlmErrorKind.noKey;
     if (noKey) {
@@ -212,6 +277,27 @@ class _LineNoteError extends StatelessWidget {
             OutlinedButton(onPressed: onRetry, child: const Text('再试一次')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LineNotePlainFallback extends StatelessWidget {
+  const _LineNotePlainFallback({required this.rawText});
+
+  final String rawText;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('结构化解析失败，先展示模型原文',
+              style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          SelectableText(rawText),
+        ],
       ),
     );
   }

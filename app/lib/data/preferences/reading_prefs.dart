@@ -5,9 +5,9 @@ library;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 排版契约常量(基线默认 24sp;用户可调范围 18–32)
+/// 排版契约常量(基线默认 24sp;用户可调范围 20–32)
 const double kDefaultContentFontSize = 24;
-const double kMinContentFontSize = 18;
+const double kMinContentFontSize = 20;
 const double kMaxContentFontSize = 32;
 
 abstract class ReadingPrefs {
@@ -65,5 +65,6 @@ class InMemoryReadingPrefs implements ReadingPrefs {
   Future<double> contentFontSize() async => _fontSize;
 
   @override
-  Future<void> setContentFontSize(double size) async => _fontSize = size;
+  Future<void> setContentFontSize(double size) async =>
+      _fontSize = size.clamp(kMinContentFontSize, kMaxContentFontSize).toDouble();
 }

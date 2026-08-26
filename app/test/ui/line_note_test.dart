@@ -120,6 +120,24 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('结构化解析失败后展示模型原文降级态', (tester) async {
+    transport.jsonQueue.addAll([
+      {'choices': [{'message': {'content': '第一份非 JSON'}}]},
+      {'choices': [{'message': {'content': '第二份非 JSON'}}]},
+    ]);
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem);
+
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('结构化解析失败，先展示模型原文'), findsOneWidget);
+    expect(find.text('第二份非 JSON'), findsOneWidget);
+    expect(transport.callCount, 2);
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('无 Key 时展示引导态而非错误堆栈', (tester) async {
     final emptyPrefs = InMemoryPrefsStore();
     final noKeyService = AnnotationService(
