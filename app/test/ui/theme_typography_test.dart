@@ -5,7 +5,7 @@ import 'package:poetry_mate/core/ui/app_theme.dart';
 
 void main() {
   // 用 MediaQuery 强制平台亮度,绕过测试环境默认 light 的干扰
-  Future<(ThemeData, TextStyle)> _pumpAndGet(
+  Future<(ThemeData, TextStyle)> pumpTheme(
     WidgetTester tester,
     TextStyle Function(BuildContext) styleOf,
     Brightness brightness,
@@ -32,7 +32,7 @@ void main() {
   }
 
   testWidgets('内容样式: 文楷族 + 大字号 + 宽行距', (tester) async {
-    final (_, style) = await _pumpAndGet(
+    final (_, style) = await pumpTheme(
       tester,
       (c) => AppTheme.contentTextStyle(c),
       Brightness.light,
@@ -43,7 +43,7 @@ void main() {
   });
 
   testWidgets('内容样式允许覆写尺寸但不得换字体族', (tester) async {
-    final (_, style) = await _pumpAndGet(
+    final (_, style) = await pumpTheme(
       tester,
       (c) => AppTheme.contentTextStyle(c, fontSize: 28),
       Brightness.light,
@@ -53,7 +53,7 @@ void main() {
   });
 
   testWidgets('界面样式: 字体族不得是文楷(双轨契约)', (tester) async {
-    final (theme, style) = await _pumpAndGet(
+    final (theme, style) = await pumpTheme(
       tester,
       (c) => AppTheme.uiTextStyle(c),
       Brightness.light,
@@ -65,9 +65,9 @@ void main() {
 
   testWidgets('亮暗双色板均可用且表面色符合纸墨设定', (tester) async {
     final (light, _) =
-        await _pumpAndGet(tester, (c) => AppTheme.uiTextStyle(c), Brightness.light);
+        await pumpTheme(tester, (c) => AppTheme.uiTextStyle(c), Brightness.light);
     final (dark, _) =
-        await _pumpAndGet(tester, (c) => AppTheme.uiTextStyle(c), Brightness.dark);
+        await pumpTheme(tester, (c) => AppTheme.uiTextStyle(c), Brightness.dark);
     expect(light.scaffoldBackgroundColor, const Color(0xFFFAF7EF));
     expect(dark.scaffoldBackgroundColor, const Color(0xFF151412));
   });
