@@ -1,0 +1,40 @@
+name: poetry_mate
+description: "Poetry Mate —— 中国古典诗词阅读与 AI 赏析"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+# drift_dev 2.34.x 声明 sqlparser ^0.44.0 却与 0.44.6 不兼容(DartPlaceholder.when 被移除),钉回 0.44.5
+dependency_overrides:
+  sqlparser: 0.44.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  drift: ^2.34.3
+  sqlite3_flutter_libs: ^0.6.0+eol
+  go_router: ^17.5.0
+  flutter_secure_storage: ^11.0.0
+  shared_preferences: ^2.5.5
+  es_compression: ^2.0.15
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.34.0
+  build_runner: ^2.15.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/seed/
+    - assets/personas/
