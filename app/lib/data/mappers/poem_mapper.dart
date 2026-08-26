@@ -39,3 +39,8 @@ class PoemMapper {
         sourceCollection: poem.sourceCollection,
       );
 }
+
+/// 行对象 → 实体的便捷扩展
+extension PoemRowEntity on PoemRow {
+  Poem toEntity() => PoemMapper.fromRow(this);
+}

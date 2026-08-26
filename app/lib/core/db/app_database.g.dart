@@ -739,15 +739,813 @@ class PoemsCompanion extends UpdateCompanion<PoemRow> {
   }
 }
 
+class $NotebookEntriesTable extends NotebookEntries
+    with TableInfo<$NotebookEntriesTable, NotebookEntryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $NotebookEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _poemIdMeta = const VerificationMeta('poemId');
+  @override
+  late final GeneratedColumn<String> poemId = GeneratedColumn<String>(
+    'poem_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _targetMeta = const VerificationMeta('target');
+  @override
+  late final GeneratedColumn<String> target = GeneratedColumn<String>(
+    'target',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contentJsonMeta = const VerificationMeta(
+    'contentJson',
+  );
+  @override
+  late final GeneratedColumn<String> contentJson = GeneratedColumn<String>(
+    'content_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _personaMeta = const VerificationMeta(
+    'persona',
+  );
+  @override
+  late final GeneratedColumn<String> persona = GeneratedColumn<String>(
+    'persona',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _userEditedMeta = const VerificationMeta(
+    'userEdited',
+  );
+  @override
+  late final GeneratedColumn<bool> userEdited = GeneratedColumn<bool>(
+    'user_edited',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("user_edited" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAt = GeneratedColumn<int>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    poemId,
+    kind,
+    target,
+    contentJson,
+    persona,
+    userEdited,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'notebook_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<NotebookEntryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('poem_id')) {
+      context.handle(
+        _poemIdMeta,
+        poemId.isAcceptableOrUnknown(data['poem_id']!, _poemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_poemIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('target')) {
+      context.handle(
+        _targetMeta,
+        target.isAcceptableOrUnknown(data['target']!, _targetMeta),
+      );
+    }
+    if (data.containsKey('content_json')) {
+      context.handle(
+        _contentJsonMeta,
+        contentJson.isAcceptableOrUnknown(
+          data['content_json']!,
+          _contentJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_contentJsonMeta);
+    }
+    if (data.containsKey('persona')) {
+      context.handle(
+        _personaMeta,
+        persona.isAcceptableOrUnknown(data['persona']!, _personaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_personaMeta);
+    }
+    if (data.containsKey('user_edited')) {
+      context.handle(
+        _userEditedMeta,
+        userEdited.isAcceptableOrUnknown(data['user_edited']!, _userEditedMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  NotebookEntryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return NotebookEntryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      poemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}poem_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      target: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target'],
+      ),
+      contentJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content_json'],
+      )!,
+      persona: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}persona'],
+      )!,
+      userEdited: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}user_edited'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $NotebookEntriesTable createAlias(String alias) {
+    return $NotebookEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class NotebookEntryRow extends DataClass
+    implements Insertable<NotebookEntryRow> {
+  /// sha256("$poemId|$kind|$target") —— 由 NotebookIds.entryId 计算
+  final String id;
+  final String poemId;
+
+  /// line_note / essay / chat_turn
+  final String kind;
+
+  /// line_note=行索引字符串; chat_turn=问题摘要; essay=null
+  final String? target;
+
+  /// 结构化内容 JSON(形态随 kind 而异)
+  final String contentJson;
+
+  /// 生成时的人格(条目不随后续切换人格而变)
+  final String persona;
+  final bool userEdited;
+
+  /// 毫秒时间戳(epoch)
+  final int createdAt;
+  final int updatedAt;
+  const NotebookEntryRow({
+    required this.id,
+    required this.poemId,
+    required this.kind,
+    this.target,
+    required this.contentJson,
+    required this.persona,
+    required this.userEdited,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['poem_id'] = Variable<String>(poemId);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || target != null) {
+      map['target'] = Variable<String>(target);
+    }
+    map['content_json'] = Variable<String>(contentJson);
+    map['persona'] = Variable<String>(persona);
+    map['user_edited'] = Variable<bool>(userEdited);
+    map['created_at'] = Variable<int>(createdAt);
+    map['updated_at'] = Variable<int>(updatedAt);
+    return map;
+  }
+
+  NotebookEntriesCompanion toCompanion(bool nullToAbsent) {
+    return NotebookEntriesCompanion(
+      id: Value(id),
+      poemId: Value(poemId),
+      kind: Value(kind),
+      target: target == null && nullToAbsent
+          ? const Value.absent()
+          : Value(target),
+      contentJson: Value(contentJson),
+      persona: Value(persona),
+      userEdited: Value(userEdited),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory NotebookEntryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return NotebookEntryRow(
+      id: serializer.fromJson<String>(json['id']),
+      poemId: serializer.fromJson<String>(json['poemId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      target: serializer.fromJson<String?>(json['target']),
+      contentJson: serializer.fromJson<String>(json['contentJson']),
+      persona: serializer.fromJson<String>(json['persona']),
+      userEdited: serializer.fromJson<bool>(json['userEdited']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+      updatedAt: serializer.fromJson<int>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'poemId': serializer.toJson<String>(poemId),
+      'kind': serializer.toJson<String>(kind),
+      'target': serializer.toJson<String?>(target),
+      'contentJson': serializer.toJson<String>(contentJson),
+      'persona': serializer.toJson<String>(persona),
+      'userEdited': serializer.toJson<bool>(userEdited),
+      'createdAt': serializer.toJson<int>(createdAt),
+      'updatedAt': serializer.toJson<int>(updatedAt),
+    };
+  }
+
+  NotebookEntryRow copyWith({
+    String? id,
+    String? poemId,
+    String? kind,
+    Value<String?> target = const Value.absent(),
+    String? contentJson,
+    String? persona,
+    bool? userEdited,
+    int? createdAt,
+    int? updatedAt,
+  }) => NotebookEntryRow(
+    id: id ?? this.id,
+    poemId: poemId ?? this.poemId,
+    kind: kind ?? this.kind,
+    target: target.present ? target.value : this.target,
+    contentJson: contentJson ?? this.contentJson,
+    persona: persona ?? this.persona,
+    userEdited: userEdited ?? this.userEdited,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  NotebookEntryRow copyWithCompanion(NotebookEntriesCompanion data) {
+    return NotebookEntryRow(
+      id: data.id.present ? data.id.value : this.id,
+      poemId: data.poemId.present ? data.poemId.value : this.poemId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      target: data.target.present ? data.target.value : this.target,
+      contentJson: data.contentJson.present
+          ? data.contentJson.value
+          : this.contentJson,
+      persona: data.persona.present ? data.persona.value : this.persona,
+      userEdited: data.userEdited.present
+          ? data.userEdited.value
+          : this.userEdited,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotebookEntryRow(')
+          ..write('id: $id, ')
+          ..write('poemId: $poemId, ')
+          ..write('kind: $kind, ')
+          ..write('target: $target, ')
+          ..write('contentJson: $contentJson, ')
+          ..write('persona: $persona, ')
+          ..write('userEdited: $userEdited, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    poemId,
+    kind,
+    target,
+    contentJson,
+    persona,
+    userEdited,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is NotebookEntryRow &&
+          other.id == this.id &&
+          other.poemId == this.poemId &&
+          other.kind == this.kind &&
+          other.target == this.target &&
+          other.contentJson == this.contentJson &&
+          other.persona == this.persona &&
+          other.userEdited == this.userEdited &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class NotebookEntriesCompanion extends UpdateCompanion<NotebookEntryRow> {
+  final Value<String> id;
+  final Value<String> poemId;
+  final Value<String> kind;
+  final Value<String?> target;
+  final Value<String> contentJson;
+  final Value<String> persona;
+  final Value<bool> userEdited;
+  final Value<int> createdAt;
+  final Value<int> updatedAt;
+  final Value<int> rowid;
+  const NotebookEntriesCompanion({
+    this.id = const Value.absent(),
+    this.poemId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.target = const Value.absent(),
+    this.contentJson = const Value.absent(),
+    this.persona = const Value.absent(),
+    this.userEdited = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  NotebookEntriesCompanion.insert({
+    required String id,
+    required String poemId,
+    required String kind,
+    this.target = const Value.absent(),
+    required String contentJson,
+    required String persona,
+    this.userEdited = const Value.absent(),
+    required int createdAt,
+    required int updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       poemId = Value(poemId),
+       kind = Value(kind),
+       contentJson = Value(contentJson),
+       persona = Value(persona),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<NotebookEntryRow> custom({
+    Expression<String>? id,
+    Expression<String>? poemId,
+    Expression<String>? kind,
+    Expression<String>? target,
+    Expression<String>? contentJson,
+    Expression<String>? persona,
+    Expression<bool>? userEdited,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (poemId != null) 'poem_id': poemId,
+      if (kind != null) 'kind': kind,
+      if (target != null) 'target': target,
+      if (contentJson != null) 'content_json': contentJson,
+      if (persona != null) 'persona': persona,
+      if (userEdited != null) 'user_edited': userEdited,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  NotebookEntriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? poemId,
+    Value<String>? kind,
+    Value<String?>? target,
+    Value<String>? contentJson,
+    Value<String>? persona,
+    Value<bool>? userEdited,
+    Value<int>? createdAt,
+    Value<int>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return NotebookEntriesCompanion(
+      id: id ?? this.id,
+      poemId: poemId ?? this.poemId,
+      kind: kind ?? this.kind,
+      target: target ?? this.target,
+      contentJson: contentJson ?? this.contentJson,
+      persona: persona ?? this.persona,
+      userEdited: userEdited ?? this.userEdited,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (poemId.present) {
+      map['poem_id'] = Variable<String>(poemId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (target.present) {
+      map['target'] = Variable<String>(target.value);
+    }
+    if (contentJson.present) {
+      map['content_json'] = Variable<String>(contentJson.value);
+    }
+    if (persona.present) {
+      map['persona'] = Variable<String>(persona.value);
+    }
+    if (userEdited.present) {
+      map['user_edited'] = Variable<bool>(userEdited.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('NotebookEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('poemId: $poemId, ')
+          ..write('kind: $kind, ')
+          ..write('target: $target, ')
+          ..write('contentJson: $contentJson, ')
+          ..write('persona: $persona, ')
+          ..write('userEdited: $userEdited, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FavoritesTable extends Favorites
+    with TableInfo<$FavoritesTable, FavoriteRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FavoritesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _poemIdMeta = const VerificationMeta('poemId');
+  @override
+  late final GeneratedColumn<String> poemId = GeneratedColumn<String>(
+    'poem_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [poemId, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'favorites';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FavoriteRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('poem_id')) {
+      context.handle(
+        _poemIdMeta,
+        poemId.isAcceptableOrUnknown(data['poem_id']!, _poemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_poemIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {poemId};
+  @override
+  FavoriteRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FavoriteRow(
+      poemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}poem_id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FavoritesTable createAlias(String alias) {
+    return $FavoritesTable(attachedDatabase, alias);
+  }
+}
+
+class FavoriteRow extends DataClass implements Insertable<FavoriteRow> {
+  final String poemId;
+  final int createdAt;
+  const FavoriteRow({required this.poemId, required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['poem_id'] = Variable<String>(poemId);
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  FavoritesCompanion toCompanion(bool nullToAbsent) {
+    return FavoritesCompanion(
+      poemId: Value(poemId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory FavoriteRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FavoriteRow(
+      poemId: serializer.fromJson<String>(json['poemId']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'poemId': serializer.toJson<String>(poemId),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  FavoriteRow copyWith({String? poemId, int? createdAt}) => FavoriteRow(
+    poemId: poemId ?? this.poemId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  FavoriteRow copyWithCompanion(FavoritesCompanion data) {
+    return FavoriteRow(
+      poemId: data.poemId.present ? data.poemId.value : this.poemId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteRow(')
+          ..write('poemId: $poemId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(poemId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FavoriteRow &&
+          other.poemId == this.poemId &&
+          other.createdAt == this.createdAt);
+}
+
+class FavoritesCompanion extends UpdateCompanion<FavoriteRow> {
+  final Value<String> poemId;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const FavoritesCompanion({
+    this.poemId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FavoritesCompanion.insert({
+    required String poemId,
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : poemId = Value(poemId),
+       createdAt = Value(createdAt);
+  static Insertable<FavoriteRow> custom({
+    Expression<String>? poemId,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (poemId != null) 'poem_id': poemId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FavoritesCompanion copyWith({
+    Value<String>? poemId,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return FavoritesCompanion(
+      poemId: poemId ?? this.poemId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (poemId.present) {
+      map['poem_id'] = Variable<String>(poemId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoritesCompanion(')
+          ..write('poemId: $poemId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $PoemsTable poems = $PoemsTable(this);
+  late final $NotebookEntriesTable notebookEntries = $NotebookEntriesTable(
+    this,
+  );
+  late final $FavoritesTable favorites = $FavoritesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [poems];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    poems,
+    notebookEntries,
+    favorites,
+  ];
 }
 
 typedef $$PoemsTableCreateCompanionBuilder =
@@ -1084,10 +1882,443 @@ typedef $$PoemsTableProcessedTableManager =
       PoemRow,
       PrefetchHooks Function()
     >;
+typedef $$NotebookEntriesTableCreateCompanionBuilder =
+    NotebookEntriesCompanion Function({
+      required String id,
+      required String poemId,
+      required String kind,
+      Value<String?> target,
+      required String contentJson,
+      required String persona,
+      Value<bool> userEdited,
+      required int createdAt,
+      required int updatedAt,
+      Value<int> rowid,
+    });
+typedef $$NotebookEntriesTableUpdateCompanionBuilder =
+    NotebookEntriesCompanion Function({
+      Value<String> id,
+      Value<String> poemId,
+      Value<String> kind,
+      Value<String?> target,
+      Value<String> contentJson,
+      Value<String> persona,
+      Value<bool> userEdited,
+      Value<int> createdAt,
+      Value<int> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$NotebookEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $NotebookEntriesTable> {
+  $$NotebookEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get poemId => $composableBuilder(
+    column: $table.poemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get target => $composableBuilder(
+    column: $table.target,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get persona => $composableBuilder(
+    column: $table.persona,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get userEdited => $composableBuilder(
+    column: $table.userEdited,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$NotebookEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotebookEntriesTable> {
+  $$NotebookEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get poemId => $composableBuilder(
+    column: $table.poemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get target => $composableBuilder(
+    column: $table.target,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get persona => $composableBuilder(
+    column: $table.persona,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get userEdited => $composableBuilder(
+    column: $table.userEdited,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$NotebookEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotebookEntriesTable> {
+  $$NotebookEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get poemId =>
+      $composableBuilder(column: $table.poemId, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get target =>
+      $composableBuilder(column: $table.target, builder: (column) => column);
+
+  GeneratedColumn<String> get contentJson => $composableBuilder(
+    column: $table.contentJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get persona =>
+      $composableBuilder(column: $table.persona, builder: (column) => column);
+
+  GeneratedColumn<bool> get userEdited => $composableBuilder(
+    column: $table.userEdited,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$NotebookEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $NotebookEntriesTable,
+          NotebookEntryRow,
+          $$NotebookEntriesTableFilterComposer,
+          $$NotebookEntriesTableOrderingComposer,
+          $$NotebookEntriesTableAnnotationComposer,
+          $$NotebookEntriesTableCreateCompanionBuilder,
+          $$NotebookEntriesTableUpdateCompanionBuilder,
+          (
+            NotebookEntryRow,
+            BaseReferences<
+              _$AppDatabase,
+              $NotebookEntriesTable,
+              NotebookEntryRow
+            >,
+          ),
+          NotebookEntryRow,
+          PrefetchHooks Function()
+        > {
+  $$NotebookEntriesTableTableManager(
+    _$AppDatabase db,
+    $NotebookEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$NotebookEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$NotebookEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$NotebookEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> poemId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String?> target = const Value.absent(),
+                Value<String> contentJson = const Value.absent(),
+                Value<String> persona = const Value.absent(),
+                Value<bool> userEdited = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => NotebookEntriesCompanion(
+                id: id,
+                poemId: poemId,
+                kind: kind,
+                target: target,
+                contentJson: contentJson,
+                persona: persona,
+                userEdited: userEdited,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String poemId,
+                required String kind,
+                Value<String?> target = const Value.absent(),
+                required String contentJson,
+                required String persona,
+                Value<bool> userEdited = const Value.absent(),
+                required int createdAt,
+                required int updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => NotebookEntriesCompanion.insert(
+                id: id,
+                poemId: poemId,
+                kind: kind,
+                target: target,
+                contentJson: contentJson,
+                persona: persona,
+                userEdited: userEdited,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$NotebookEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $NotebookEntriesTable,
+      NotebookEntryRow,
+      $$NotebookEntriesTableFilterComposer,
+      $$NotebookEntriesTableOrderingComposer,
+      $$NotebookEntriesTableAnnotationComposer,
+      $$NotebookEntriesTableCreateCompanionBuilder,
+      $$NotebookEntriesTableUpdateCompanionBuilder,
+      (
+        NotebookEntryRow,
+        BaseReferences<_$AppDatabase, $NotebookEntriesTable, NotebookEntryRow>,
+      ),
+      NotebookEntryRow,
+      PrefetchHooks Function()
+    >;
+typedef $$FavoritesTableCreateCompanionBuilder =
+    FavoritesCompanion Function({
+      required String poemId,
+      required int createdAt,
+      Value<int> rowid,
+    });
+typedef $$FavoritesTableUpdateCompanionBuilder =
+    FavoritesCompanion Function({
+      Value<String> poemId,
+      Value<int> createdAt,
+      Value<int> rowid,
+    });
+
+class $$FavoritesTableFilterComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get poemId => $composableBuilder(
+    column: $table.poemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FavoritesTableOrderingComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get poemId => $composableBuilder(
+    column: $table.poemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FavoritesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FavoritesTable> {
+  $$FavoritesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get poemId =>
+      $composableBuilder(column: $table.poemId, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$FavoritesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FavoritesTable,
+          FavoriteRow,
+          $$FavoritesTableFilterComposer,
+          $$FavoritesTableOrderingComposer,
+          $$FavoritesTableAnnotationComposer,
+          $$FavoritesTableCreateCompanionBuilder,
+          $$FavoritesTableUpdateCompanionBuilder,
+          (
+            FavoriteRow,
+            BaseReferences<_$AppDatabase, $FavoritesTable, FavoriteRow>,
+          ),
+          FavoriteRow,
+          PrefetchHooks Function()
+        > {
+  $$FavoritesTableTableManager(_$AppDatabase db, $FavoritesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FavoritesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FavoritesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FavoritesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> poemId = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FavoritesCompanion(
+                poemId: poemId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String poemId,
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => FavoritesCompanion.insert(
+                poemId: poemId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FavoritesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FavoritesTable,
+      FavoriteRow,
+      $$FavoritesTableFilterComposer,
+      $$FavoritesTableOrderingComposer,
+      $$FavoritesTableAnnotationComposer,
+      $$FavoritesTableCreateCompanionBuilder,
+      $$FavoritesTableUpdateCompanionBuilder,
+      (
+        FavoriteRow,
+        BaseReferences<_$AppDatabase, $FavoritesTable, FavoriteRow>,
+      ),
+      FavoriteRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$PoemsTableTableManager get poems =>
       $$PoemsTableTableManager(_db, _db.poems);
+  $$NotebookEntriesTableTableManager get notebookEntries =>
+      $$NotebookEntriesTableTableManager(_db, _db.notebookEntries);
+  $$FavoritesTableTableManager get favorites =>
+      $$FavoritesTableTableManager(_db, _db.favorites);
 }

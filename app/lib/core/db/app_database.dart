@@ -9,22 +9,28 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
+import 'favorites_table.dart';
+import 'notebook_table.dart';
 import 'poems_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Poems])
+@DriftDatabase(tables: [Poems, NotebookEntries, Favorites])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
-          // schema v1 基线;后续变更在此按版本追加 step
+          // v1 → v2: 新增注本与收藏两表(reader-ai-annotation 变更)
+          if (from < 2) {
+            await m.createTable(notebookEntries);
+            await m.createTable(favorites);
+          }
         },
       );
 }

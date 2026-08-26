@@ -9,6 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/db/app_database.dart';
 import '../features/browse/browse_filters.dart';
 import '../domain/entities/poem.dart';
+import '../core/llm/llm_providers.dart';
+import 'preferences/reading_prefs.dart';
+import 'repositories/favorites_repository.dart';
+import 'repositories/notebook_repository.dart';
 import 'repositories/poem_repository.dart';
 
 /// 由 main() overrideWithValue 注入;未注入即用 = 编程错误
@@ -43,3 +47,13 @@ final poemByIdProvider =
     FutureProvider.autoDispose.family<Poem?, String>((ref, id) {
   return ref.watch(poemRepositoryProvider).byId(id);
 });
+
+
+final notebookRepositoryProvider = Provider<NotebookRepository>(
+    (ref) => DriftNotebookRepository(ref.watch(appDatabaseProvider)));
+
+final favoritesRepositoryProvider = Provider<FavoritesRepository>(
+    (ref) => DriftFavoritesRepository(ref.watch(appDatabaseProvider)));
+
+final readingPrefsProvider =
+    Provider<ReadingPrefs>((ref) => SharedReadingPrefs(ref.watch(sharedPreferencesAsyncProvider)));

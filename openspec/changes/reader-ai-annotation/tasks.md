@@ -19,10 +19,14 @@
 
 ## 2. 数据库 v2 与偏好
 
-- [ ] 2.1 schema v2 迁移：新增 notebook_entries / favorites 两表(字段见 design D4)；迁移测试
-- [ ] 2.2 NotebookRepository：upsert/byPoem/listAll/userEdited 保护语义；单测
-- [ ] 2.3 FavoritesRepository：toggle/isFavorite/listByRecent；单测
-- [ ] 2.4 阅读偏好存取：白文开关 + 字号(20–32,默认24)；shared_prefs 读写单测
+- [x] 2.1 schema v2 迁移：新增 notebook_entries / favorites 两表(字段见 design D4)；迁移测试
+  - 真实迁移测试: 手工构造 v1 库文件(user_version=1+旧行) → 打开升级 → 新表就位旧行保留
+- [x] 2.2 NotebookRepository：upsert/byTarget/byPoem/listAll/updateUserContent/delete
+  - 同目标 upsert 覆盖不重复; updateUserContent 标记 user_edited; listAll 倒序; 6 个单测
+- [x] 2.3 FavoritesRepository：add/remove/isFavorite/listByRecent(联表带诗实体)/count
+  - listByRecent 按收藏时间倒序; upsert 防重; 4 个单测
+- [x] 2.4 阅读偏好存取：白文开关 + 字号(18–32,默认24)；shared_prefs 读写单测
+  - 抽象/实现分离(InMemory 测试); 越界值 clamp 收敛; kDefaultContentFontSize=24 契约常量
 
 ## 3. 阅读页三层披露
 

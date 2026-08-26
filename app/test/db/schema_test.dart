@@ -31,8 +31,8 @@ void main() {
     sourceCollection: 'seed',
   );
 
-  test('schemaVersion 固定为 1(迁移基线)', () {
-    expect(db.schemaVersion, 1);
+  test('schemaVersion 升至 2(v1 基线 + 注本/收藏表)', () {
+    expect(db.schemaVersion, 2);
   });
 
   test('插入并回读: 字段完整、null 显式、JSON 数组解码正确', () async {

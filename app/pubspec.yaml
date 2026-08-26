@@ -24,6 +24,7 @@ dependencies:
   es_compression: ^2.0.15
   path: ^1.9.0
   path_provider: ^2.1.6
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
@@ -33,6 +34,7 @@ dev_dependencies:
   drift_dev: ^2.34.0
   build_runner: ^2.15.1
   shared_preferences_platform_interface: ^2.4.2
+  sqlite3: ^3.5.2
 
 flutter:
   uses-material-design: true
