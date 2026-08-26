@@ -126,7 +126,8 @@ class AnnotationService {
           '{\n'
           ' "summary": "白话大意",\n'
           ' "craft": [{"point": "手法要点", "detail": "结合诗句的具体分析"}],\n'
-          ' "mood": "意境与情感",\n'
+          ' "mood": "意境",\n'
+          ' "emotion": "情感",\n'
           ' "background": {"text": "创作背景", "uncertain": true|false}\n'
           '}\n背景与典故无把握时 text 留空且 uncertain=true。',
       parse: EssayContent.tryParse,

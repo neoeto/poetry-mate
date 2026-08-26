@@ -19,7 +19,8 @@ const lineNoteJson =
     '{"translation":"月光洒在床前","notes":[{"term":"疑","explain":"好像"}]}';
 const essayJson = '{"summary":"游子思乡",'
     '"craft":[{"point":"疑字","detail":"以幻写真"}],'
-    '"mood":"静夜清愁",'
+    '"mood":"静夜意境",'
+    '"emotion":"思乡清愁",'
     '"background":{"text":"相传作于出蜀途中","uncertain":true}}';
 
 void main() {
@@ -166,9 +167,10 @@ void main() {
 
       expect(essay.summary, '游子思乡');
       expect(essay.craft.single.point, '疑字');
-      expect(essay.mood, '静夜清愁');
+      expect(essay.mood, '静夜意境');
       expect(essay.background.text, contains('出蜀途中'));
       expect(essay.background.uncertain, isTrue);
+      expect(essay.emotion, '思乡清愁');
     });
 
     test('markdown 围栏自动剥离', () async {
@@ -181,7 +183,8 @@ void main() {
       });
 
       final essay = await service.getOrCreateEssay(poem);
-      expect(essay.mood, '静夜清愁');
+      expect(essay.mood, '静夜意境');
+      expect(essay.emotion, '思乡清愁');
     });
 
     test('连续两次坏 JSON → badResponse 且注本无残留', () async {

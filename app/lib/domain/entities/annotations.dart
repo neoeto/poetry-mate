@@ -134,18 +134,24 @@ class EssayContent {
     required this.summary,
     required this.craft,
     required this.mood,
+    this.emotion = '',
     required this.background,
   });
 
   final String summary;
   final List<EssayCraftItem> craft;
+  /// 意境描述(兼容旧缓存中的 mood 字段)
   final String mood;
+
+  /// 情感判断;旧版本缓存缺失时为空
+  final String emotion;
   final EssayBackground background;
 
   Map<String, dynamic> toJson() => {
         'summary': summary,
         'craft': [for (final c in craft) c.toJson()],
         'mood': mood,
+        'emotion': emotion,
         'background': background.toJson(),
       };
 
@@ -182,6 +188,7 @@ class EssayContent {
       summary: (json['summary'] ?? '').toString(),
       craft: parseCraft(json['craft']),
       mood: (json['mood'] ?? '').toString(),
+      emotion: (json['emotion'] ?? '').toString(),
       background: parseBackground(json['background']),
     );
   }
@@ -196,12 +203,14 @@ class EssayContent {
     String? summary,
     List<EssayCraftItem>? craft,
     String? mood,
+    String? emotion,
     EssayBackground? background,
   }) =>
       EssayContent(
         summary: summary ?? this.summary,
         craft: craft ?? this.craft,
         mood: mood ?? this.mood,
+        emotion: emotion ?? this.emotion,
         background: background ?? this.background,
       );
 }
