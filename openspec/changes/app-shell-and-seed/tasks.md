@@ -28,7 +28,11 @@
 - [ ] 2.3 集成 zstd 解压能力并在 Android/iOS 双端真机验证（design D4 风险前置）
   - 进度: es_compression 已接入(ZstdDecoder.convert), 解压函数可注入设计;
     宿主探测确认 mac 缺 eszstd-mac64.dylib(测试优雅跳过); 真实资产就位
-  - ⬜ 待办: Android/iOS 真机各跑一次装载冒烟, 确认 FFI 加载成功
+  - ✅ iOS 模拟器验证通过(2026-08): es zstd FFI 解压成功,
+    [seed] installed 300 条(v20260825.b8594f81) —— 核心风险解除
+  - ⬜ Android 待办: gradle 构建被公司网络环境卡住(dl.google.com 需代理白名单,
+    kotlin 2.2.20 仅存于 google maven), 已加阿里云镜像+nonProxyHosts 分流仍未通,
+    需按内部网络方案处理(内网 maven 镜像或 VPN)
 - [x] 2.4 实现种子装载器：读资产 → 解压 → 单事务 upsert → 写 seed_version 标记；含"同版本跳过""高版本重灌"两条路径的测试
   - SeedLoader: version.txt 对账 → 解压(可注入) → 单事务 insertOnConflictUpdate → 成功后才写标记
   - 6 个路径测试: 首装/同版跳过(零解压)/升级upsert/事务失败回滚/无资产静默跳过/1000条性能
@@ -61,7 +65,9 @@
 - [x] 4.3 收藏/我的占位页（友好空状态文案）；今日占位（本地随机一首卡片 + "策展功能即将到来"提示）
   - 今日页: 本地随机一首卡(下拉换一首) + AI策展预告横幅; 空库友好文案
   - 收藏: 空状态插画式文案('读到心动处,点一颗心'); 我的: 四项功能预告清单+关于
-- [ ] 4.4 简读页接入词的长短句呈现（逐行渲染 paragraphs，序文暂按正文样式，降级呈现归 reading-page）
+- [x] 4.4 简读页接入词的长短句呈现（逐行渲染 paragraphs，序文暂按正文样式，降级呈现归 reading-page）
+  - 已随 3.3 实现(ReaderPage 逐行渲染+词长短句测试); 序文按正文样式与任务描述一致
+  - 深链 /poem/:id 已接 PoemRoutePage(byId 三态)
 
 ## 5. 验收
 

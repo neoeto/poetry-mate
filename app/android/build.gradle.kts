@@ -1,5 +1,9 @@
 allprojects {
     repositories {
+        // 国内镜像优先(公司网络直连 dl.google.com 不稳定)
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/central") }
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
         google()
         mavenCentral()
     }
