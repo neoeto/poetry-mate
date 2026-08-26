@@ -5,46 +5,10 @@
 ///   baseUrl / model → shared_preferences(非机密)
 
 library;
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'prefs_store.dart';
 import 'secure_key_store.dart';
 
-/// 普通键值存储抽象(与 SecureKeyStore 同构,测试注入内存实现)。
-abstract class PrefsStore {
-  Future<String?> getString(String key);
-  Future<void> setString(String key, String value);
-  Future<void> remove(String key);
-}
-
-class SharedPrefsStore implements PrefsStore {
-  SharedPrefsStore(this._prefs);
-
-  final SharedPreferencesAsync _prefs;
-
-  @override
-  Future<String?> getString(String key) => _prefs.getString(key);
-
-  @override
-  Future<void> setString(String key, String value) =>
-      _prefs.setString(key, value);
-
-  @override
-  Future<void> remove(String key) => _prefs.remove(key);
-}
-
-/// 内存实现(测试)
-class InMemoryPrefsStore implements PrefsStore {
-  final Map<String, String> values = {};
-
-  @override
-  Future<String?> getString(String key) async => values[key];
-
-  @override
-  Future<void> setString(String key, String value) async => values[key] = value;
-
-  @override
-  Future<void> remove(String key) async => values.remove(key);
-}
+export 'prefs_store.dart';
 
 class LlmConfig {
   const LlmConfig({

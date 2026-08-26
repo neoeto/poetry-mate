@@ -7,7 +7,8 @@
 library;
 
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'prefs_store.dart';
 
 class Persona {
   const Persona(this.id, this.name, this.description, this.assetPath);
@@ -33,14 +34,14 @@ Persona personaById(String id) =>
 class PersonaService {
   PersonaService({
     required AssetBundle assets,
-    required SharedPreferencesAsync prefs,
+    required PrefsStore prefs,
   })  : _assets = assets,
         _prefs = prefs;
 
   static const _key = 'persona_id';
 
   final AssetBundle _assets;
-  final SharedPreferencesAsync _prefs;
+  final PrefsStore _prefs;
 
   Future<String> selectedId() async =>
       await _prefs.getString(_key) ?? defaultPersonaId;

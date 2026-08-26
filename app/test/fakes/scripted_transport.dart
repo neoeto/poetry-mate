@@ -11,6 +11,11 @@ import 'package:poetry_mate/core/llm/llm_transport.dart';
 class ScriptedTransport implements LlmTransport {
   ScriptedTransport({this.jsonResult, this.statusError, this.sseText});
 
+  int callCount = 0;
+
+  /// 按序消耗的响应队列(非空时优先于 jsonResult)
+  final List<Map<String, dynamic>> jsonQueue = [];
+
   /// postJson 返回的响应体
   Map<String, dynamic>? jsonResult;
 
@@ -34,9 +39,13 @@ class ScriptedTransport implements LlmTransport {
     lastUrl = url;
     lastHeaders = headers;
     lastBody = body;
+    callCount++;
     final status = statusError;
     if (status != null) {
       throw statusToError(status, errorBody);
+    }
+    if (jsonQueue.isNotEmpty) {
+      return jsonQueue.removeAt(0);
     }
     return jsonResult!;
   }
