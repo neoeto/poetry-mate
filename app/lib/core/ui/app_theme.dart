@@ -38,4 +38,41 @@ class AppTheme {
       scaffoldBackgroundColor: scheme.surface,
     );
   }
+
+  /// 内容层文字样式 —— 诗词正文/序文/注释专用(任务 3.2 双轨制)。
+  ///
+  /// 排版契约(config.yaml):
+  /// - 文楷字体族;缺字由引擎回退系统 CJK 字体;
+  /// - 默认 24sp(诗行极短,可承载大字),行高 ≥1.9;
+  /// - 调用方只覆写尺寸/颜色,不得替换 fontFamily。
+  static TextStyle contentTextStyle(
+    BuildContext context, {
+    double fontSize = 24,
+    double height = 2.0,
+    Color? color,
+    FontWeight fontWeight = FontWeight.w400,
+  }) {
+    return Theme.of(context).textTheme.bodyLarge!.copyWith(
+          fontFamily: PoetryFonts.content,
+          fontSize: fontSize,
+          height: height,
+          color: color,
+          fontWeight: fontWeight,
+        );
+  }
+
+  /// 界面层文字样式 —— 显式声明走系统黑体(与内容层形成双轨)。
+  static TextStyle uiTextStyle(
+    BuildContext context, {
+    double? fontSize,
+    Color? color,
+    FontWeight fontWeight = FontWeight.w500,
+  }) {
+    return Theme.of(context).textTheme.labelLarge!.copyWith(
+          // 不设 fontFamily → 系统默认
+          fontSize: fontSize,
+          color: color,
+          fontWeight: fontWeight,
+        );
+  }
 }
