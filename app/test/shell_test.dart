@@ -4,11 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:drift/native.dart';
+import 'package:poetry_mate/core/db/app_database.dart';
+import 'package:poetry_mate/data/providers.dart';
 import 'package:poetry_mate/main.dart';
 
 Future<void> _pumpApp(WidgetTester tester) async {
   await tester.pumpWidget(
-    const ProviderScope(child: PoetryMateApp()),
+    ProviderScope(
+      overrides: [
+        // 空内存库: 验证真实页面在无数据时的语义
+        appDatabaseProvider.overrideWithValue(
+          AppDatabase(NativeDatabase.memory()),
+        ),
+      ],
+      child: const PoetryMateApp(),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -25,7 +36,7 @@ void main() {
     await _pumpApp(tester);
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('功能将在后续版本到来'), findsOneWidget);
+    expect(find.text('该分类下暂无诗篇'), findsOneWidget);
   });
 
   testWidgets('阅读页深链占位可达', (tester) async {
@@ -33,6 +44,6 @@ void main() {
     final context = tester.element(find.byType(NavigationBar));
     context.go('/poem/abc123');
     await tester.pumpAndSettle();
-    expect(find.textContaining('id=abc123'), findsOneWidget);
+    expect(find.text('未找到该诗篇'), findsOneWidget);
   });
 }

@@ -7,6 +7,9 @@ library;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/browse/browse_page.dart';
+import '../../features/reader/poem_route_page.dart';
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 class TabSpec {
@@ -40,21 +43,33 @@ GoRouter buildAppRouter() {
               routes: [
                 GoRoute(
                   path: tab.path,
-                  builder: (_, _) => _TabPlaceholder(spec: tab),
+                  builder: (_, _) => _branchPage(tab.path),
                 ),
               ],
             ),
         ],
       ),
-      // 阅读页顶层深链(内容由任务 reading-page 变更实现,当前占位)
+      // 阅读页顶层深链
       GoRoute(
         path: '/poem/:id',
-        builder: (context, state) => _ReaderPlaceholder(
-          id: state.pathParameters['id'] ?? '',
+        builder: (context, state) => PoemRoutePage(
+          poemId: state.pathParameters['id'] ?? '',
         ),
       ),
     ],
   );
+}
+
+/// 各分支页面装配(今日/收藏/我的仍为占位,随对应任务落地)
+Widget _branchPage(String path) {
+  switch (path) {
+    case '/browse':
+      return const BrowsePage();
+    default:
+      return _TabPlaceholder(
+        spec: _tabs.firstWhere((t) => t.path == path),
+      );
+  }
 }
 
 /// 底部导航壳:M3 NavigationBar,点击回首次位置(再点回顶语义留给页面内处理)。
@@ -107,16 +122,4 @@ class _TabPlaceholder extends StatelessWidget {
   }
 }
 
-class _ReaderPlaceholder extends StatelessWidget {
-  const _ReaderPlaceholder({required this.id});
 
-  final String id;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('诗')),
-      body: Center(child: Text('阅读页占位 · id=$id')),
-    );
-  }
-}

@@ -1,0 +1,79 @@
+/// 分类页 —— 朝代 × 类型过滤浏览种子集(任务 4.2)。
+///
+/// 列表项: 展示标题(词类回退词牌) + 作者·朝代;
+/// 点击进入阅读页深链 /poem/:id。
+
+library;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../data/providers.dart';
+import 'browse_filters.dart';
+
+class BrowsePage extends ConsumerWidget {
+  const BrowsePage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(browseFilterProvider);
+    final poemsAsync = ref.watch(filteredPoemsProvider(selected));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('分类')),
+      body: Column(
+        children: [
+          // ── 过滤 chips ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                for (final f in BrowseFilters.all)
+                  FilterChip(
+                    label: Text(f.label),
+                    selected: selected == f.key,
+                    onSelected: (_) =>
+                        ref.read(browseFilterProvider.notifier).state = f.key,
+                  ),
+              ],
+            ),
+          ),
+          // ── 诗列表 ──
+          Expanded(
+            child: poemsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('加载失败: $e')),
+              data: (poems) {
+                if (poems.isEmpty) {
+                  return const Center(child: Text('该分类下暂无诗篇'));
+                }
+                return ListView.builder(
+                  itemCount: poems.length,
+                  itemBuilder: (_, index) {
+                    final poem = poems[index];
+                    return ListTile(
+                      title: Text(
+                        poem.displayTitle.isEmpty
+                            ? poem.paragraphs.first
+                            : poem.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text('${poem.author} · ${poem.dynasty}'),
+                      trailing: poem.popularity != null
+                          ? Text(poem.popularity!.toStringAsFixed(1),
+                              style: Theme.of(context).textTheme.labelSmall)
+                          : null,
+                      onTap: () => context.push('/poem/${poem.id}'),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
