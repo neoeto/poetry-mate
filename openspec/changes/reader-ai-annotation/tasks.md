@@ -6,7 +6,11 @@
   - SecureKeyStore 抽象(Flutter实现+内存替身) + LlmConfigStore(分离存储/残缺返回null/clear)
   - 5 个测试: 读写一致/Key不落prefs/残缺null/清空; 踩坑: secure_storage v11 移除旧参数,
     SharedPreferencesAsync 测试需 platform interface 注入
-- [ ] 1.2 设置页真实化：三元组表单 + 连接测试按钮 + 保存反馈；「我的」占位项替换
+- [x] 1.2 设置页真实化：三元组表单 + 连接测试按钮 + 保存反馈；「我的」占位项替换
+  - LlmSettingsPage: 预填/保存/Key遮蔽切换/连接测试(先测后存不落盘)
+  - llmTransportProvider 注入化 → 测试替身可覆盖; MinePage LLM配置项启用跳转
+  - PrefsStore 抽象重构(SecureKeyStore 同构模式), 平台接口测试注入痛点消除
+  - 4 个 widget 测试: 预填/保存落库/测试成功显示回复/401显示密钥无效
 - [x] 1.3 OpenAI 兼容客户端：chatCompletion(json 模式) 与 streamChat(SSE)，错误映射六类；用假 HTTP 层写单测(成功/401/429/超时/坏JSON)
   - LlmTransport 抽象(Http 实现 + 脚本化测试替身); 错误映射提为纯函数 statusToError 可测
   - SSE 解析独立纯函数 extractSseContent(容忍噪声行/[DONE]终止); json_object 模式; maxTokens null-aware

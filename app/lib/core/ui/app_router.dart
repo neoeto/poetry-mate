@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/browse/browse_page.dart';
 import '../../features/favorites/favorites_page.dart';
+import '../../features/settings/llm_settings_page.dart';
 import '../../features/settings/mine_page.dart';
 import '../../features/today/today_page.dart';
 import '../../features/reader/poem_route_page.dart';
@@ -52,6 +53,12 @@ GoRouter buildAppRouter() {
             ),
         ],
       ),
+      // LLM 配置子页
+      GoRoute(
+        path: '/settings/llm',
+        builder: (_, _) => const LlmSettingsPage(),
+      ),
+
       // 阅读页顶层深链
       GoRoute(
         path: '/poem/:id',

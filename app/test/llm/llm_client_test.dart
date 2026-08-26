@@ -1,9 +1,6 @@
 /// OpenAI 兼容客户端测试 —— 脚本化传输替身,无真实网络。
 
 library;
-import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/llm/llm_client.dart';
@@ -11,70 +8,17 @@ import 'package:poetry_mate/core/llm/llm_config.dart';
 import 'package:poetry_mate/core/llm/llm_exception.dart';
 import 'package:poetry_mate/core/llm/llm_transport.dart';
 import 'package:poetry_mate/core/llm/secure_key_store.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import '../fakes/scripted_transport.dart';
 
-class ScriptedTransport implements LlmTransport {
-  ScriptedTransport({this.jsonResult, this.statusError, this.sseText});
-
-  /// postJson 返回的响应体
-  Map<String, dynamic>? jsonResult;
-
-  /// 非 null 时 postJson/postStream 抛此状态错误
-  int? statusError;
-  String errorBody = '{"error":{"message":"boom"}}';
-
-  /// postStream 吐出的 SSE 文本(按行)
-  String? sseText;
-
-  Uri? lastUrl;
-  Map<String, String> lastHeaders = {};
-  Map<String, dynamic> lastBody = {};
-
-  @override
-  Future<Map<String, dynamic>> postJson(
-    Uri url,
-    Map<String, String> headers,
-    Map<String, dynamic> body,
-  ) async {
-    lastUrl = url;
-    lastHeaders = headers;
-    lastBody = body;
-    final status = statusError;
-    if (status != null) {
-      throw statusToError(status, errorBody);
-    }
-    return jsonResult!;
-  }
-
-  @override
-  Stream<List<int>> postStream(
-    Uri url,
-    Map<String, String> headers,
-    Map<String, dynamic> body,
-  ) async* {
-    lastUrl = url;
-    lastHeaders = headers;
-    lastBody = body;
-    final status = statusError;
-    if (status != null) {
-      throw statusToError(status, errorBody);
-    }
-    yield Uint8List.fromList(utf8.encode(sseText ?? ''));
-  }
-}
 
 LlmClient _client(ScriptedTransport transport) {
-  SharedPreferencesAsyncPlatform.instance =
-      InMemorySharedPreferencesAsync.withData({
-    'llm_base_url': 'https://api.example.com/v1',
-    'llm_model': 'test-model',
-  });
+  final prefs = InMemoryPrefsStore();
+  prefs.values['llm_base_url'] = 'https://api.example.com/v1';
+  prefs.values['llm_model'] = 'test-model';
   return LlmClient(
     configStore: LlmConfigStoreImpl(
-      secureKeyStore: _StaticSecure('sk-live'),
-      prefs: SharedPreferencesAsync(),
+      secureKeyStore: const _StaticSecure('sk-live'),
+      prefs: prefs,
     ),
     transport: transport,
   );
@@ -135,12 +79,11 @@ void main() {
   });
 
   test('未配置三元组 → noKey', () async {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.withData({});
+
     final client = LlmClient(
       configStore: LlmConfigStoreImpl(
         secureKeyStore: const _StaticSecure(null),
-        prefs: SharedPreferencesAsync(),
+        prefs: InMemoryPrefsStore(),
       ),
       transport: ScriptedTransport(jsonResult: {}),
     );

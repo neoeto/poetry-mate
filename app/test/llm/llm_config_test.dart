@@ -3,13 +3,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/llm/llm_config.dart';
 import 'package:poetry_mate/core/llm/secure_key_store.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   late LlmConfigStore store;
   late InMemorySecureKeyStore secure;
+  late InMemoryPrefsStore prefs;
 
   const config = LlmConfig(
     baseUrl: 'https://api.example.com/v1',
@@ -18,12 +16,11 @@ void main() {
   );
 
   setUp(() {
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.withData({});
     secure = InMemorySecureKeyStore();
+    prefs = InMemoryPrefsStore();
     store = LlmConfigStoreImpl(
       secureKeyStore: secure,
-      prefs: SharedPreferencesAsync(),
+      prefs: prefs,
     );
   });
 
@@ -41,9 +38,8 @@ void main() {
 
   test('Key 存于安全存储而非偏好', () async {
     await store.write(config);
-    final prefs = await SharedPreferencesAsync().getAll();
-    expect(prefs.values.any((v) => v.toString().contains('sk-test')), isFalse,
-        reason: 'Key 不得进入 shared_preferences');
+    expect(prefs.values.values.any((v) => v.contains('sk-test')), isFalse,
+        reason: 'Key 不得进入偏好存储');
     expect(await secure.read('llm_api_key'), config.apiKey);
   });
 

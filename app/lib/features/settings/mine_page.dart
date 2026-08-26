@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class MinePage extends StatelessWidget {
   const MinePage({super.key});
@@ -15,7 +16,13 @@ class MinePage extends StatelessWidget {
         children: [
           const SizedBox(height: 8),
           _coming(context, Icons.auto_stories, '导入书架', '从数据源搬回整座图书馆'),
-          _coming(context, Icons.psychology_outlined, 'LLM 配置', '接入你自己的 AI 模型'),
+          ListTile(
+            leading: const Icon(Icons.psychology_outlined),
+            title: const Text('LLM 配置'),
+            subtitle: const Text('接入你自己的 AI 模型'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/settings/llm'),
+          ),
           _coming(context, Icons.face_retouching_natural, '人格选择', '先生 · 知音 · 词客'),
           _coming(context, Icons.book_outlined, '我的注本', '你的批注与足迹'),
           ListTile(
