@@ -7,7 +7,10 @@
   - 5 个测试: 读写一致/Key不落prefs/残缺null/清空; 踩坑: secure_storage v11 移除旧参数,
     SharedPreferencesAsync 测试需 platform interface 注入
 - [ ] 1.2 设置页真实化：三元组表单 + 连接测试按钮 + 保存反馈；「我的」占位项替换
-- [ ] 1.3 OpenAI 兼容客户端：chatCompletion(json 模式) 与 streamChat(SSE)，错误映射六类；用假 HTTP 层写单测(成功/401/429/超时/坏JSON)
+- [x] 1.3 OpenAI 兼容客户端：chatCompletion(json 模式) 与 streamChat(SSE)，错误映射六类；用假 HTTP 层写单测(成功/401/429/超时/坏JSON)
+  - LlmTransport 抽象(Http 实现 + 脚本化测试替身); 错误映射提为纯函数 statusToError 可测
+  - SSE 解析独立纯函数 extractSseContent(容忍噪声行/[DONE]终止); json_object 模式; maxTokens null-aware
+  - 7 个客户端测试: 端点/鉴权头/jsonMode/noKey/状态码映射/空choices/SSE解析
 - [ ] 1.4 人格模板资产：三份 prompt 模板入 assets/personas/，PersonaService 加载与选择持久化
 
 ## 2. 数据库 v2 与偏好
