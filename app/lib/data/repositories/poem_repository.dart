@@ -15,6 +15,9 @@ abstract class PoemRepository {
   /// 按 id 获取单首;不存在返回 null
   Future<Poem?> byId(String id);
 
+  /// 随机一首(“今日占位”用);空库返回 null
+  Future<Poem?> randomOne();
+
   /// 按朝代/类型列出(自然稳定序: 热度降序,id 升序兜底);
   /// 参数为 null 表示不过滤该维度
   Future<List<Poem>> listByDynastyAndType({
@@ -36,6 +39,15 @@ class DriftPoemRepository implements PoemRepository {
   @override
   Future<Poem?> byId(String id) async {
     final query = _db.select(_db.poems)..where((t) => t.id.equals(id));
+    final row = await query.getSingleOrNull();
+    return row == null ? null : PoemMapper.fromRow(row);
+  }
+
+  @override
+  Future<Poem?> randomOne() async {
+    final query = _db.select(_db.poems)
+      ..orderBy([(t) => OrderingTerm.random()])
+      ..limit(1);
     final row = await query.getSingleOrNull();
     return row == null ? null : PoemMapper.fromRow(row);
   }

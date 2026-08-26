@@ -8,6 +8,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/browse/browse_page.dart';
+import '../../features/favorites/favorites_page.dart';
+import '../../features/settings/mine_page.dart';
+import '../../features/today/today_page.dart';
 import '../../features/reader/poem_route_page.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -60,15 +63,19 @@ GoRouter buildAppRouter() {
   );
 }
 
-/// 各分支页面装配(今日/收藏/我的仍为占位,随对应任务落地)
+/// 各分支页面装配(全部真实化;今日策展/收藏功能后续版本增强)
 Widget _branchPage(String path) {
   switch (path) {
+    case '/today':
+      return const TodayPage();
     case '/browse':
       return const BrowsePage();
+    case '/favorites':
+      return const FavoritesPage();
+    case '/settings':
+      return const MinePage();
     default:
-      return _TabPlaceholder(
-        spec: _tabs.firstWhere((t) => t.path == path),
-      );
+      return const SizedBox.shrink();
   }
 }
 
@@ -100,26 +107,3 @@ class HomeShell extends StatelessWidget {
     );
   }
 }
-
-class _TabPlaceholder extends StatelessWidget {
-  const _TabPlaceholder({required this.spec});
-
-  final TabSpec spec;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(spec.icon, size: 48, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: 12),
-          Text('${spec.label} · 功能将在后续版本到来',
-              style: Theme.of(context).textTheme.bodyMedium),
-        ],
-      ),
-    );
-  }
-}
-
-
