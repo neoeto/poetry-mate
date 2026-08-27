@@ -104,4 +104,24 @@ void main() {
 
     expect(find.textContaining('密钥无效'), findsOneWidget);
   });
+
+  testWidgets('读取已有配置失败也能进入表单', (tester) async {
+    configStore = _ThrowingConfigStore();
+
+    await pumpPage(tester);
+
+    expect(find.byType(TextField), findsNWidgets(3));
+    expect(find.textContaining('配置读取失败'), findsOneWidget);
+  });
+}
+
+class _ThrowingConfigStore implements LlmConfigStore {
+  @override
+  Future<LlmConfig?> read() async => throw StateError('keychain unavailable');
+
+  @override
+  Future<void> write(LlmConfig config) async {}
+
+  @override
+  Future<void> clear() async {}
 }

@@ -22,6 +22,7 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   final _apiKeyController = TextEditingController();
   bool _obscureKey = true;
   bool _loaded = false;
+  String? _loadError;
 
   String? _testStatus; // null=未测试
   bool? _testOk;
@@ -34,18 +35,29 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
   }
 
   Future<void> _loadExisting() async {
-    final config =
-        await ref.read(llmConfigStoreProvider).read();
-    if (!mounted || config == null) {
-      setState(() => _loaded = true);
-      return;
+    try {
+      final config = await ref
+          .read(llmConfigStoreProvider)
+          .read()
+          .timeout(const Duration(seconds: 5));
+      if (!mounted) return;
+      setState(() {
+        if (config != null) {
+          _baseUrlController.text = config.baseUrl;
+          _modelController.text = config.model;
+          _apiKeyController.text = config.apiKey;
+        }
+        _loaded = true;
+      });
+    } catch (_) {
+      // Keychain/偏好读取失败不能把配置页永久卡在 loading；
+      // 允许用户重新填写并覆盖保存，不展示平台异常细节。
+      if (!mounted) return;
+      setState(() {
+        _loaded = true;
+        _loadError = '已有配置读取失败，请重新填写并保存。';
+      });
     }
-    setState(() {
-      _baseUrlController.text = config.baseUrl;
-      _modelController.text = config.model;
-      _apiKeyController.text = config.apiKey;
-      _loaded = true;
-    });
   }
 
   @override
@@ -69,7 +81,12 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
       _showSnack('三项都需要填写');
       return;
     }
-    await ref.read(llmConfigStoreProvider).write(_configFromFields());
+    try {
+      await ref.read(llmConfigStoreProvider).write(_configFromFields());
+    } catch (_) {
+      if (mounted) _showSnack('安全存储暂不可用，请稍后再试');
+      return;
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('已保存')));
@@ -118,19 +135,24 @@ class _LlmSettingsPageState extends ConsumerState<LlmSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return Scaffold(
       appBar: AppBar(title: const Text('LLM 配置')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (!_loaded) const LinearProgressIndicator(),
+          if (!_loaded) const SizedBox(height: 12),
           Text('接入你自己的 OpenAI 兼容模型服务（BYOK）。\n'
               'API Key 只保存在本机安全存储中。',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          if (_loadError != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _loadError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
           const SizedBox(height: 16),
           TextField(
             controller: _baseUrlController,
