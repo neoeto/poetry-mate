@@ -157,10 +157,40 @@ class HttpLlmTransport implements LlmTransport {
     if (error is HttpException && error.message.trim().isNotEmpty) {
       return LlmException(LlmErrorKind.network, '网络请求失败：${error.message}');
     }
+    if (error is ArgumentError) {
+      final detail = _safeErrorDetail(error.message);
+      return LlmException(
+        LlmErrorKind.network,
+        detail.isEmpty
+            ? '网络请求参数无效，请检查 Base URL'
+            : '网络请求参数无效：$detail',
+      );
+    }
+    if (error is FormatException) {
+      final detail = _safeErrorDetail(error.message);
+      return LlmException(
+        LlmErrorKind.network,
+        detail.isEmpty ? '请求格式无效，请检查配置' : '请求格式无效：$detail',
+      );
+    }
     return LlmException(
       LlmErrorKind.network,
       '网络请求失败（${error.runtimeType}），请检查网络连接与 Base URL',
     );
+  }
+
+  String _safeErrorDetail(Object? value) {
+    var text = value?.toString().trim() ?? '';
+    // 错误摘要可能包含 header 值；界面与日志均不得暴露 API Key。
+    text = text.replaceAll(
+      RegExp(r'Bearer\s+[^ )]+', caseSensitive: false),
+      'Bearer ***',
+    );
+    text = text.replaceAll(
+      RegExp(r'\bsk-[A-Za-z0-9._-]+\b'),
+      '***',
+    );
+    return text.length > 180 ? '${text.substring(0, 180)}…' : text;
   }
 
   LlmException _statusError(int statusCode, String bodySnippet) =>
