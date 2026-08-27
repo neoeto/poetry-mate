@@ -126,7 +126,12 @@ class HttpLlmTransport implements LlmTransport {
     }
 
     try {
-      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      request.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'application/json; charset=utf-8',
+      );
+      // content-type 的 charset 会让 HttpClientRequest.write 使用 UTF-8；
+      // 不能再设置 request.encoding（请求创建后该 setter 不可变）。
       for (final entry in headers.entries) {
         request.headers.set(entry.key, entry.value);
       }
