@@ -19,6 +19,9 @@ class ScriptedTransport implements LlmTransport {
   /// postJson 返回的响应体
   Map<String, dynamic>? jsonResult;
 
+  /// 按序让 postJson 抛出状态码错误(用于模拟 JSON mode 不被支持等情况)
+  final List<int> jsonStatusQueue = [];
+
   /// 非 null 时 postJson 抛此状态码错误
   int? statusError;
 
@@ -43,7 +46,9 @@ class ScriptedTransport implements LlmTransport {
     lastHeaders = headers;
     lastBody = body;
     callCount++;
-    final status = statusError;
+    final status = jsonStatusQueue.isNotEmpty
+        ? jsonStatusQueue.removeAt(0)
+        : statusError;
     if (status != null) {
       throw statusToError(status, errorBody);
     }

@@ -290,7 +290,9 @@ class AnnotationService {
 
       String raw;
       try {
-        raw = await _llm.complete(messages, jsonMode: true);
+        // 首次请求使用 JSON mode；部分 OpenAI 兼容服务不支持
+        // response_format，第二次改用普通请求并由提示词约束 JSON。
+        raw = await _llm.complete(messages, jsonMode: attempt == 0);
         lastRaw = raw;
       } on LlmException catch (e) {
         if (e.kind != LlmErrorKind.badResponse) rethrow;

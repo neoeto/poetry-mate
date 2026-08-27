@@ -53,9 +53,9 @@ class LlmConfigStoreImpl implements LlmConfigStore {
 
   @override
   Future<LlmConfig?> read() async {
-    final apiKey = await _secure.read(_keyApiKey);
-    final baseUrl = await _prefs.getString(_keyBaseUrl);
-    final model = await _prefs.getString(_keyModel);
+    final apiKey = (await _secure.read(_keyApiKey))?.trim();
+    final baseUrl = (await _prefs.getString(_keyBaseUrl))?.trim();
+    final model = (await _prefs.getString(_keyModel))?.trim();
     if (apiKey == null || baseUrl == null || model == null) return null;
     if (apiKey.isEmpty || baseUrl.isEmpty || model.isEmpty) return null;
     return LlmConfig(baseUrl: baseUrl, apiKey: apiKey, model: model);

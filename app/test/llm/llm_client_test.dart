@@ -78,6 +78,56 @@ void main() {
         (transport.lastBody['response_format'] as Map)['type'], 'json_object');
   });
 
+  test('Base URL 已是完整 endpoint 时不重复拼接', () async {
+    final prefs = InMemoryPrefsStore()
+      ..values['llm_base_url'] =
+          'https://api.example.com/v1/chat/completions'
+      ..values['llm_model'] = 'test-model';
+    final transport = ScriptedTransport(
+      jsonResult: {
+        'choices': [
+          {'message': {'content': 'ok'}}
+        ],
+      },
+    );
+    final client = LlmClient(
+      configStore: LlmConfigStoreImpl(
+        secureKeyStore: const _StaticSecure('sk-live'),
+        prefs: prefs,
+      ),
+      transport: transport,
+    );
+
+    await client.complete([const LlmMessage('user', 'x')]);
+
+    expect(
+      transport.lastUrl.toString(),
+      'https://api.example.com/v1/chat/completions',
+    );
+  });
+
+  test('Base URL 不是 http(s) 地址 → 产品化错误', () async {
+    final prefs = InMemoryPrefsStore()
+      ..values['llm_base_url'] = 'api.example.com/v1'
+      ..values['llm_model'] = 'test-model';
+    final client = LlmClient(
+      configStore: LlmConfigStoreImpl(
+        secureKeyStore: const _StaticSecure('sk-live'),
+        prefs: prefs,
+      ),
+      transport: ScriptedTransport(jsonResult: {}),
+    );
+
+    await expectLater(
+      client.complete([const LlmMessage('user', 'x')]),
+      throwsA(isA<LlmException>().having(
+        (error) => error.message,
+        'message',
+        contains('Base URL 格式不正确'),
+      )),
+    );
+  });
+
   test('未配置三元组 → noKey', () async {
 
     final client = LlmClient(

@@ -259,6 +259,11 @@ class _LineNoteError extends StatelessWidget {
       return _NoKeyGuide(onOpenSettings: onOpenSettings);
     }
 
+    final llmError = error;
+    final title = llmError is LlmException ? llmError.title : '这次没能生成注解';
+    final detail = llmError is LlmException
+        ? llmError.message
+        : '请检查网络连接与 Base URL，或稍后再试。';
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 20),
@@ -267,10 +272,11 @@ class _LineNoteError extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off_outlined),
             const SizedBox(height: 8),
-            const Text('这次没能生成注解'),
+            Text(title),
             const SizedBox(height: 4),
             Text(
-              '请检查网络或稍后再试。',
+              detail,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),

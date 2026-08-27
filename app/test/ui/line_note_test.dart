@@ -138,6 +138,20 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('HTTP 鉴权失败展示具体原因', (tester) async {
+    transport.statusError = 401;
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem);
+
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('密钥无效'), findsOneWidget);
+    expect(find.textContaining('boom'), findsOneWidget);
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('无 Key 时展示引导态而非错误堆栈', (tester) async {
     final emptyPrefs = InMemoryPrefsStore();
     final noKeyService = AnnotationService(

@@ -319,6 +319,11 @@ class _EssayError extends StatelessWidget {
       return _EssayNoKeyGuide(onOpenSettings: onOpenSettings);
     }
 
+    final llmError = error;
+    final title = llmError is LlmException ? llmError.title : '这次没能生成赏析';
+    final detail = llmError is LlmException
+        ? llmError.message
+        : '请检查网络连接与 Base URL，或稍后再试。';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -327,10 +332,11 @@ class _EssayError extends StatelessWidget {
           children: [
             const Icon(Icons.cloud_off_outlined),
             const SizedBox(height: 10),
-            const Text('这次没能生成赏析'),
+            Text(title),
             const SizedBox(height: 5),
             Text(
-              '请检查网络或稍后再试。',
+              detail,
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 14),

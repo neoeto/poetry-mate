@@ -291,11 +291,15 @@ class _ChatError extends StatelessWidget {
       );
     }
 
+    final llmError = error;
+    final detail = llmError is LlmException
+        ? '${llmError.title}：${llmError.message}'
+        : '暂时没能回答，请检查网络连接与 Base URL。';
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: Row(
         children: [
-          const Expanded(child: Text('暂时没能回答，请稍后再试。')),
+          Expanded(child: Text(detail)),
           if (onRetry != null)
             TextButton(onPressed: onRetry, child: const Text('重试')),
         ],

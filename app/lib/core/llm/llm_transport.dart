@@ -50,13 +50,22 @@ class HttpLlmTransport implements LlmTransport {
     Map<String, dynamic> body,
   ) async {
     final response = await _send(url, headers, body);
-    final text = await response
-        .transform(utf8.decoder)
-        .join()
-        .timeout(receiveTimeout, onTimeout: () => throw LlmException(
-              LlmErrorKind.network,
-              '响应超时，请检查网络或稍后再试',
-            ));
+    final String text;
+    try {
+      text = await response
+          .transform(utf8.decoder)
+          .join()
+          .timeout(receiveTimeout);
+    } on TimeoutException {
+      throw const LlmException(
+        LlmErrorKind.network,
+        '响应超时，请检查网络或稍后再试',
+      );
+    } on LlmException {
+      rethrow;
+    } on Object catch (error) {
+      throw _networkError(error);
+    }
     if (response.statusCode >= 400) {
       throw _statusError(response.statusCode, text);
     }
@@ -76,10 +85,28 @@ class HttpLlmTransport implements LlmTransport {
   ) async* {
     final response = await _send(url, headers, body);
     if (response.statusCode >= 400) {
-      final text = await response.transform(utf8.decoder).join();
+      final String text;
+      try {
+        text = await response.transform(utf8.decoder).join();
+      } on TimeoutException {
+        throw const LlmException(
+          LlmErrorKind.network,
+          '响应超时，请检查网络或稍后再试',
+        );
+      } on LlmException {
+        rethrow;
+      } on Object catch (error) {
+        throw _networkError(error);
+      }
       throw _statusError(response.statusCode, text);
     }
-    yield* response;
+    try {
+      yield* response;
+    } on LlmException {
+      rethrow;
+    } on Object catch (error) {
+      throw _networkError(error);
+    }
   }
 
   Future<HttpClientResponse> _send(
@@ -92,23 +119,45 @@ class HttpLlmTransport implements LlmTransport {
       request = await _client.postUrl(url).timeout(connectTimeout);
     } on TimeoutException {
       throw const LlmException(LlmErrorKind.network, '连接超时，请检查网络');
-    } on SocketException catch (e) {
-      throw LlmException(LlmErrorKind.network, '网络不通: ${e.message}');
+    } on LlmException {
+      rethrow;
+    } on Object catch (error) {
+      throw _networkError(error);
     }
-
-    request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
-    for (final entry in headers.entries) {
-      request.headers.set(entry.key, entry.value);
-    }
-    request.write(jsonEncode(body));
 
     try {
+      request.headers.set(HttpHeaders.contentTypeHeader, 'application/json');
+      for (final entry in headers.entries) {
+        request.headers.set(entry.key, entry.value);
+      }
+      request.write(jsonEncode(body));
       return await request.close().timeout(connectTimeout);
     } on TimeoutException {
       throw const LlmException(LlmErrorKind.network, '连接超时，请检查网络');
-    } on SocketException catch (e) {
-      throw LlmException(LlmErrorKind.network, '网络不通: ${e.message}');
+    } on LlmException {
+      rethrow;
+    } on Object catch (error) {
+      throw _networkError(error);
     }
+  }
+
+  LlmException _networkError(Object error) {
+    if (error is HandshakeException) {
+      return const LlmException(
+        LlmErrorKind.network,
+        'TLS 握手失败，请确认 Base URL 使用 HTTPS 且证书有效',
+      );
+    }
+    if (error is SocketException && error.message.trim().isNotEmpty) {
+      return LlmException(LlmErrorKind.network, '网络不通：${error.message}');
+    }
+    if (error is HttpException && error.message.trim().isNotEmpty) {
+      return LlmException(LlmErrorKind.network, '网络请求失败：${error.message}');
+    }
+    return const LlmException(
+      LlmErrorKind.network,
+      '网络请求失败，请检查网络连接与 Base URL',
+    );
   }
 
   LlmException _statusError(int statusCode, String bodySnippet) =>

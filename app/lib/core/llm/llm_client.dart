@@ -88,8 +88,26 @@ class LlmClient {
 
   Uri _endpoint(LlmConfig config) {
     var base = config.baseUrl.trim();
-    if (base.endsWith('/')) base = base.substring(0, base.length - 1);
-    return Uri.parse('$base/chat/completions');
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    // 容忍用户误把完整 endpoint 粘进 Base URL，避免重复拼接。
+    final value = base.endsWith('/chat/completions')
+        ? base
+        : '$base/chat/completions';
+    try {
+      final uri = Uri.parse(value);
+      if ((uri.scheme != 'https' && uri.scheme != 'http') ||
+          uri.host.isEmpty) {
+        throw const FormatException('必须是带域名的 http(s) 地址');
+      }
+      return uri;
+    } on FormatException catch (error) {
+      throw LlmException(
+        LlmErrorKind.badResponse,
+        'Base URL 格式不正确：${error.message}',
+      );
+    }
   }
 
   Map<String, String> _headers(LlmConfig config) => {

@@ -97,6 +97,22 @@ void main() {
       expect(userText.contains('第 1 行'), isTrue);
     });
 
+    test('JSON mode 不被兼容服务支持时，第二次改用普通请求', () async {
+      final poem = testPoem(paragraphs: ['床前看月光。']);
+      transport.jsonStatusQueue.add(400);
+      transport.jsonQueue.add({
+        'choices': [
+          {'message': {'content': lineNoteJson}}
+        ],
+      });
+
+      final note = await service.getOrCreateLineNote(poem, 0);
+
+      expect(note.translation, '月光洒在床前');
+      expect(transport.callCount, 2);
+      expect(transport.lastBody.containsKey('response_format'), isFalse);
+    });
+
     test('缓存命中: 不再发起网络调用', () async {
       final poem = testPoem(paragraphs: ['床前看月光。']);
       transport.jsonResult = {

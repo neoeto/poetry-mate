@@ -19,6 +19,16 @@ class LlmException implements Exception {
   final LlmErrorKind kind;
   final String message;
 
+  /// 面向用户的短标题；[message] 保留可行动的具体原因。
+  String get title => switch (kind) {
+        LlmErrorKind.noKey => '还没有配置 AI',
+        LlmErrorKind.network => '网络连接失败',
+        LlmErrorKind.auth => '密钥无效',
+        LlmErrorKind.rateLimit => '请求太频繁',
+        LlmErrorKind.server => '模型服务异常',
+        LlmErrorKind.badResponse => '模型返回异常',
+      };
+
   @override
   String toString() => 'LlmException($kind): $message';
 }
