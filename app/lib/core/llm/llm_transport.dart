@@ -142,10 +142,13 @@ class HttpLlmTransport implements LlmTransport {
   }
 
   LlmException _networkError(Object error) {
-    if (error is HandshakeException) {
-      return const LlmException(
+    if (error is TlsException) {
+      final detail = error.message.trim();
+      return LlmException(
         LlmErrorKind.network,
-        'TLS 握手失败，请确认 Base URL 使用 HTTPS 且证书有效',
+        detail.isEmpty
+            ? 'TLS 握手失败，请确认 Base URL 使用 HTTPS 且证书有效'
+            : 'TLS 握手失败：$detail',
       );
     }
     if (error is SocketException && error.message.trim().isNotEmpty) {
@@ -154,9 +157,9 @@ class HttpLlmTransport implements LlmTransport {
     if (error is HttpException && error.message.trim().isNotEmpty) {
       return LlmException(LlmErrorKind.network, '网络请求失败：${error.message}');
     }
-    return const LlmException(
+    return LlmException(
       LlmErrorKind.network,
-      '网络请求失败，请检查网络连接与 Base URL',
+      '网络请求失败（${error.runtimeType}），请检查网络连接与 Base URL',
     );
   }
 
