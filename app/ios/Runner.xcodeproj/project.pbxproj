@@ -484,6 +484,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.poetrymate.poetryMate;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				CODE_SIGN_ENTITLEMENTS = Runner/Release.entitlements;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
@@ -643,6 +644,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
+				CODE_SIGN_ENTITLEMENTS = Runner/Release.entitlements;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -666,6 +668,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.poetrymate.poetryMate;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
