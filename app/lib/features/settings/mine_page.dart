@@ -21,7 +21,12 @@ class MinePage extends ConsumerWidget {
       body: ListView(
         children: [
           const SizedBox(height: 8),
-          _coming(context, Icons.auto_stories, '导入书架', '从数据源搬回整座图书馆'),
+          _navigationTile(
+            Icons.auto_stories,
+            '导入书架',
+            '从数据源搬回整座图书馆',
+            () => context.push('/settings/import'),
+          ),
           ListTile(
             leading: const Icon(Icons.psychology_outlined),
             title: const Text('LLM 配置'),
@@ -68,7 +73,12 @@ class MinePage extends ConsumerWidget {
               ],
             ),
           ),
-          _coming(context, Icons.book_outlined, '我的注本', '你的批注与足迹'),
+          _navigationTile(
+            Icons.book_outlined,
+            '我的注本',
+            '你的批注与足迹',
+            () => context.push('/settings/notebook'),
+          ),
           const Divider(height: 28),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -140,21 +150,18 @@ class MinePage extends ConsumerWidget {
     );
   }
 
-  Widget _coming(
-    BuildContext context,
+  Widget _navigationTile(
     IconData icon,
     String title,
     String subtitle,
+    VoidCallback onTap,
   ) {
-    final outline = Theme.of(context).colorScheme.outline;
-    final comingStyle =
-        Theme.of(context).textTheme.labelSmall?.copyWith(color: outline);
     return ListTile(
-      enabled: false,
-      leading: Icon(icon, color: outline),
+      leading: Icon(icon),
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: Text('即将', style: comingStyle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

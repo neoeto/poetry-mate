@@ -11,6 +11,7 @@ class NotebookKind {
   static const lineNote = 'line_note';
   static const essay = 'essay';
   static const chatTurn = 'chat_turn';
+  static const wordNote = 'word_note';
 }
 
 class NotebookEntry {
@@ -39,16 +40,16 @@ class NotebookEntry {
   final DateTime updatedAt;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'poem_id': poemId,
-        'kind': kind,
-        'target': target,
-        'content': content,
-        'persona': persona,
-        'user_edited': userEdited,
-        'created_at': createdAt.millisecondsSinceEpoch,
-        'updated_at': updatedAt.millisecondsSinceEpoch,
-      };
+    'id': id,
+    'poem_id': poemId,
+    'kind': kind,
+    'target': target,
+    'content': content,
+    'persona': persona,
+    'user_edited': userEdited,
+    'created_at': createdAt.millisecondsSinceEpoch,
+    'updated_at': updatedAt.millisecondsSinceEpoch,
+  };
 }
 
 /// 稳定条目 ID: sha256("$poemId|$kind|$target")

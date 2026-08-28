@@ -11,10 +11,7 @@ import '../../data/providers.dart';
 import '../../domain/entities/notebook_entry.dart';
 
 class NotebookEntryEditor extends ConsumerStatefulWidget {
-  const NotebookEntryEditor({
-    super.key,
-    required this.entry,
-  });
+  const NotebookEntryEditor({super.key, required this.entry});
 
   final NotebookEntry entry;
 
@@ -47,6 +44,8 @@ class _NotebookEntryEditorState extends ConsumerState<NotebookEntryEditor> {
         return '赏析大意 / 我的批注';
       case NotebookKind.chatTurn:
         return '回答 / 我的补充';
+      case NotebookKind.wordNote:
+        return '词语解释 / 我的理解';
       default:
         return '我的批注';
     }
@@ -61,6 +60,8 @@ class _NotebookEntryEditorState extends ConsumerState<NotebookEntryEditor> {
         content['summary'] = _controller.text;
       case NotebookKind.chatTurn:
         content['answer'] = _controller.text;
+      case NotebookKind.wordNote:
+        content['explain'] = _controller.text;
       default:
         content['note'] = _controller.text;
     }
@@ -70,7 +71,9 @@ class _NotebookEntryEditorState extends ConsumerState<NotebookEntryEditor> {
   Future<void> _save() async {
     if (_saving) return;
     setState(() => _saving = true);
-    await ref.read(notebookRepositoryProvider).updateUserContent(
+    await ref
+        .read(notebookRepositoryProvider)
+        .updateUserContent(
           id: widget.entry.id,
           content: _updatedContent(),
           updatedAtMs: DateTime.now().millisecondsSinceEpoch,
@@ -204,6 +207,8 @@ String _editableText(NotebookEntry entry) {
       return (entry.content['summary'] ?? '').toString();
     case NotebookKind.chatTurn:
       return (entry.content['answer'] ?? '').toString();
+    case NotebookKind.wordNote:
+      return (entry.content['explain'] ?? '').toString();
     default:
       return (entry.content['note'] ?? '').toString();
   }
@@ -217,6 +222,8 @@ String _entryDescription(NotebookEntry entry) {
       return '整篇赏析';
     case NotebookKind.chatTurn:
       return '追问：${entry.target ?? ''}';
+    case NotebookKind.wordNote:
+      return '用户选词解释 · ${(entry.content['term'] ?? entry.target ?? '').toString()}';
     default:
       return entry.kind;
   }
@@ -243,9 +250,7 @@ Future<bool> confirmRegeneration(
     context: context,
     builder: (context) => AlertDialog(
       title: const Text('重新生成赏析？'),
-      content: Text(
-        userEdited ? '这条注本包含你的手写内容，继续会覆盖它。' : '将使用当前人格重新请求 AI。',
-      ),
+      content: Text(userEdited ? '这条注本包含你的手写内容，继续会覆盖它。' : '将使用当前人格重新请求 AI。'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, false),

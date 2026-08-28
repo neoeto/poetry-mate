@@ -46,19 +46,173 @@ Map<String, dynamic>? tryDecodeJsonObject(String raw) {
 // ---------------------------------------------------------------------------
 
 class KeywordNote {
-  const KeywordNote({required this.term, required this.explain});
+  const KeywordNote({
+    required this.term,
+    required this.explain,
+    this.pinyin = '',
+  });
 
   final String term;
   final String explain;
+  final String pinyin;
 
-  Map<String, dynamic> toJson() => {'term': term, 'explain': explain};
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'term': term, 'explain': explain};
+    if (pinyin.trim().isNotEmpty) json['pinyin'] = pinyin.trim();
+    return json;
+  }
 }
 
-class LineNoteContent {
-  const LineNoteContent({
-    required this.translation,
-    required this.notes,
+/// 词语解释来源。
+class WordNoteSource {
+  const WordNoteSource._();
+
+  /// L2 整篇赏析主动挑出的词语。
+  static const automatic = 'automatic';
+
+  /// 用户在原文中选择后生成的词语解释。
+  static const selected = 'selected';
+}
+
+/// 诗词中的词语解释。
+///
+/// 自动赏析只需要 [term] / [explain] / [lineIndex]；用户选词解释还会
+/// 保存精确的 UTF-16 选区 [start] / [end]，避免同一个词在同一句出现
+/// 多次时无法区分。所有位置都以 APP 当前保存的原文为准。
+class WordNote {
+  const WordNote({
+    required this.term,
+    required this.explain,
+    this.pinyin = '',
+    this.lineIndex,
+    this.start,
+    this.end,
+    this.source = WordNoteSource.automatic,
+    this.uncertain = false,
   });
+
+  final String term;
+  final String explain;
+  final String pinyin;
+  final int? lineIndex;
+  final int? start;
+  final int? end;
+  final String source;
+  final bool uncertain;
+
+  bool get isUserSelected => source == WordNoteSource.selected;
+
+  Map<String, dynamic> toJson() {
+    final json = <String, dynamic>{'term': term, 'explain': explain};
+    if (pinyin.trim().isNotEmpty) json['pinyin'] = pinyin.trim();
+    if (lineIndex != null) json['line_index'] = lineIndex;
+    if (start != null) json['start'] = start;
+    if (end != null) json['end'] = end;
+    if (source != WordNoteSource.automatic) json['source'] = source;
+    if (uncertain) json['uncertain'] = true;
+    return json;
+  }
+
+  static WordNote? tryParse(String raw) {
+    final decoded = tryDecodeJsonObject(raw);
+    return decoded == null ? null : fromJson(decoded);
+  }
+
+  WordNote copyWith({
+    String? term,
+    String? explain,
+    String? pinyin,
+    int? lineIndex,
+    int? start,
+    int? end,
+    String? source,
+    bool? uncertain,
+  }) => WordNote(
+    term: term ?? this.term,
+    explain: explain ?? this.explain,
+    pinyin: pinyin ?? this.pinyin,
+    lineIndex: lineIndex ?? this.lineIndex,
+    start: start ?? this.start,
+    end: end ?? this.end,
+    source: source ?? this.source,
+    uncertain: uncertain ?? this.uncertain,
+  );
+
+  static WordNote? fromJson(dynamic value) {
+    if (value is! Map) return null;
+    final rawTerm = value['term'];
+    final rawExplain = value['explain'];
+    if (rawTerm is! String || rawExplain is! String) return null;
+    final term = rawTerm.trim();
+    final explain = rawExplain.trim();
+    if (term.isEmpty || explain.isEmpty) return null;
+    final rawPinyin = value['pinyin'] ?? value['pronunciation'];
+    final pinyin = rawPinyin is String ? rawPinyin.trim() : '';
+
+    int? nonNegativeInt(dynamic raw) {
+      return switch (raw) {
+        int value when value >= 0 => value,
+        num value when value >= 0 && value == value.truncateToDouble() =>
+          value.toInt(),
+        String value => switch (int.tryParse(value)) {
+          final parsed? when parsed >= 0 => parsed,
+          _ => null,
+        },
+        _ => null,
+      };
+    }
+
+    final lineIndex = nonNegativeInt(value['line_index'] ?? value['lineIndex']);
+    final start = nonNegativeInt(value['start']);
+    final end = nonNegativeInt(value['end']);
+    final rawSource = value['source'] ?? value['origin'];
+    final source = rawSource is String && rawSource == WordNoteSource.selected
+        ? WordNoteSource.selected
+        : WordNoteSource.automatic;
+    return WordNote(
+      term: term,
+      explain: explain,
+      pinyin: pinyin,
+      lineIndex: lineIndex,
+      start: start,
+      end: end,
+      source: source,
+      uncertain: value['uncertain'] == true,
+    );
+  }
+}
+
+/// 用户选择的一段正文位置，用于生成稳定的本地注本条目。
+class SelectedWordPosition {
+  const SelectedWordPosition({
+    required this.lineIndex,
+    required this.start,
+    required this.end,
+    required this.term,
+  });
+
+  final int lineIndex;
+  final int start;
+  final int end;
+  final String term;
+
+  String get target => selectedWordNoteTarget(
+    lineIndex: lineIndex,
+    start: start,
+    end: end,
+    term: term,
+  );
+}
+
+String selectedWordNoteTarget({
+  required int lineIndex,
+  required int start,
+  required int end,
+  required String term,
+}) => '$lineIndex:$start:$end:${term.trim()}';
+
+class LineNoteContent {
+  const LineNoteContent({required this.translation, required this.notes});
 
   /// 白话直译
   final String translation;
@@ -67,9 +221,9 @@ class LineNoteContent {
   final List<KeywordNote> notes;
 
   Map<String, dynamic> toJson() => {
-        'translation': translation,
-        'notes': [for (final n in notes) n.toJson()],
-      };
+    'translation': translation,
+    'notes': [for (final n in notes) n.toJson()],
+  };
 
   static LineNoteContent fromJson(Map<String, dynamic> json) {
     String translationOf(dynamic v) => v is String ? v.trim() : '';
@@ -80,10 +234,20 @@ class LineNoteContent {
         if (item is! Map) continue;
         final term = item['term'];
         final explain = item['explain'];
+        final rawPinyin = item['pinyin'] ?? item['pronunciation'];
+        final pinyin = rawPinyin is String ? rawPinyin.trim() : '';
         if (term is String && explain is String && explain.isNotEmpty) {
-          notes.add(KeywordNote(term: term.trim(), explain: explain.trim()));
+          notes.add(
+            KeywordNote(
+              term: term.trim(),
+              explain: explain.trim(),
+              pinyin: pinyin,
+            ),
+          );
         } else if (term is String && term.isNotEmpty) {
-          notes.add(KeywordNote(term: term.trim(), explain: ''));
+          notes.add(
+            KeywordNote(term: term.trim(), explain: '', pinyin: pinyin),
+          );
         }
       }
     }
@@ -136,10 +300,12 @@ class EssayContent {
     required this.mood,
     this.emotion = '',
     required this.background,
+    this.wordNotes = const [],
   });
 
   final String summary;
   final List<EssayCraftItem> craft;
+
   /// 意境描述(兼容旧缓存中的 mood 字段)
   final String mood;
 
@@ -147,13 +313,17 @@ class EssayContent {
   final String emotion;
   final EssayBackground background;
 
+  /// 赏析中挑出的词语解释，用于在原文页生成可点击的下划线提示。
+  final List<WordNote> wordNotes;
+
   Map<String, dynamic> toJson() => {
-        'summary': summary,
-        'craft': [for (final c in craft) c.toJson()],
-        'mood': mood,
-        'emotion': emotion,
-        'background': background.toJson(),
-      };
+    'summary': summary,
+    'craft': [for (final c in craft) c.toJson()],
+    'mood': mood,
+    'emotion': emotion,
+    'background': background.toJson(),
+    'word_notes': [for (final note in wordNotes) note.toJson()],
+  };
 
   static EssayContent fromJson(Map<String, dynamic> json) {
     List<EssayCraftItem> parseCraft(dynamic v) {
@@ -161,10 +331,12 @@ class EssayContent {
       if (v is List) {
         for (final item in v) {
           if (item is! Map) continue;
-          items.add(EssayCraftItem(
-            point: (item['point'] ?? '').toString(),
-            detail: (item['detail'] ?? '').toString(),
-          ));
+          items.add(
+            EssayCraftItem(
+              point: (item['point'] ?? '').toString(),
+              detail: (item['detail'] ?? '').toString(),
+            ),
+          );
         }
       }
       return items;
@@ -184,12 +356,18 @@ class EssayContent {
       return const EssayBackground(text: '', uncertain: true);
     }
 
+    List<WordNote> parseWordNotes(dynamic v) {
+      if (v is! List) return [];
+      return [for (final item in v) ?WordNote.fromJson(item)];
+    }
+
     return EssayContent(
       summary: (json['summary'] ?? '').toString(),
       craft: parseCraft(json['craft']),
       mood: (json['mood'] ?? '').toString(),
       emotion: (json['emotion'] ?? '').toString(),
       background: parseBackground(json['background']),
+      wordNotes: parseWordNotes(json['word_notes'] ?? json['wordNotes']),
     );
   }
 
@@ -205,14 +383,15 @@ class EssayContent {
     String? mood,
     String? emotion,
     EssayBackground? background,
-  }) =>
-      EssayContent(
-        summary: summary ?? this.summary,
-        craft: craft ?? this.craft,
-        mood: mood ?? this.mood,
-        emotion: emotion ?? this.emotion,
-        background: background ?? this.background,
-      );
+    List<WordNote>? wordNotes,
+  }) => EssayContent(
+    summary: summary ?? this.summary,
+    craft: craft ?? this.craft,
+    mood: mood ?? this.mood,
+    emotion: emotion ?? this.emotion,
+    background: background ?? this.background,
+    wordNotes: wordNotes ?? this.wordNotes,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -233,15 +412,12 @@ class ChatTurnContent {
   final String question;
   final String answer;
 
-  Map<String, dynamic> toJson() => {
-        'question': question,
-        'answer': answer,
-      };
+  Map<String, dynamic> toJson() => {'question': question, 'answer': answer};
 
   static ChatTurnContent fromJson(Map<String, dynamic> json) => ChatTurnContent(
-        question: (json['question'] ?? '').toString(),
-        answer: (json['answer'] ?? '').toString(),
-      );
+    question: (json['question'] ?? '').toString(),
+    answer: (json['answer'] ?? '').toString(),
+  );
 
   static ChatTurnContent? tryParse(String raw) {
     final decoded = tryDecodeJsonObject(raw);

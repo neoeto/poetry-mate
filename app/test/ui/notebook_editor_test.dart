@@ -13,10 +13,7 @@ void main() {
     poemId: 'poem-editor-test',
     kind: NotebookKind.lineNote,
     target: '1',
-    content: {
-      'translation': '原来的理解',
-      'notes': <Map<String, dynamic>>[],
-    },
+    content: {'translation': '原来的理解', 'notes': <Map<String, dynamic>>[]},
     persona: 'zhiyin',
     userEdited: false,
     createdAt: DateTime(2026, 1, 1),
@@ -29,12 +26,20 @@ void main() {
     repository = _FakeNotebookRepository(entry);
   });
 
-  Future<void> pumpEditor(WidgetTester tester) async {
+  Future<void> pumpEditor(
+    WidgetTester tester, {
+    NotebookEntry? value,
+    _FakeNotebookRepository? valueRepository,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [notebookRepositoryProvider.overrideWithValue(repository)],
+        overrides: [
+          notebookRepositoryProvider.overrideWithValue(
+            valueRepository ?? repository,
+          ),
+        ],
         child: MaterialApp(
-          home: Scaffold(body: NotebookEntryEditor(entry: entry)),
+          home: Scaffold(body: NotebookEntryEditor(entry: value ?? entry)),
         ),
       ),
     );
@@ -50,6 +55,41 @@ void main() {
 
     expect(repository.updatedEntry?.userEdited, isTrue);
     expect(repository.updatedEntry?.content['translation'], '这是我的新理解');
+  });
+
+  testWidgets('用户选词注本编辑修改解释并保留原词', (tester) async {
+    final selected = NotebookEntry(
+      id: 'selected-word-entry',
+      poemId: 'poem-editor-test',
+      kind: NotebookKind.wordNote,
+      target: '0:0:1:孤',
+      content: {
+        'term': '孤',
+        'explain': '原来的解释',
+        'line_index': 0,
+        'start': 0,
+        'end': 1,
+        'source': 'selected',
+      },
+      persona: 'zhiyin',
+      userEdited: false,
+      createdAt: DateTime(2026, 1, 1),
+      updatedAt: DateTime(2026, 1, 1),
+    );
+    final selectedRepository = _FakeNotebookRepository(selected);
+    await pumpEditor(
+      tester,
+      value: selected,
+      valueRepository: selectedRepository,
+    );
+
+    await tester.enterText(find.byType(TextField), '这是我的解释');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(selectedRepository.updatedEntry?.userEdited, isTrue);
+    expect(selectedRepository.updatedEntry?.content['term'], '孤');
+    expect(selectedRepository.updatedEntry?.content['explain'], '这是我的解释');
   });
 
   testWidgets('删除注本需要两次确认', (tester) async {
@@ -76,10 +116,7 @@ void main() {
           builder: (context) => Scaffold(
             body: FilledButton(
               onPressed: () async {
-                result = await confirmRegeneration(
-                  context,
-                  userEdited: true,
-                );
+                result = await confirmRegeneration(context, userEdited: true);
               },
               child: const Text('重新生成'),
             ),

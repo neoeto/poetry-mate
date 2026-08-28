@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/repositories/notebook_repository.dart';
+import 'package:poetry_mate/domain/entities/annotations.dart';
 import 'package:poetry_mate/domain/entities/notebook_entry.dart';
 
 void main() {
@@ -24,10 +25,14 @@ void main() {
       poemId: poemId,
       kind: kind,
       target: target,
-      content: content ??
-          {'translation': '直译内容', 'notes': [
-            {'term': '锁', 'explain': '凝滞感'}
-          ]},
+      content:
+          content ??
+          {
+            'translation': '直译内容',
+            'notes': [
+              {'term': '锁', 'explain': '凝滞感'},
+            ],
+          },
       persona: 'zhiyin',
       userEdited: userEdited,
       createdAt: now,
@@ -43,26 +48,72 @@ void main() {
 
   test('upsert + byTarget: 写入后按目标命中', () async {
     final e = entry(
-      id: notebookEntryId(poemId: 'poem1', kind: NotebookKind.lineNote, target: '0'),
+      id: notebookEntryId(
+        poemId: 'poem1',
+        kind: NotebookKind.lineNote,
+        target: '0',
+      ),
     );
     await repo.upsert(e);
 
     final hit = await repo.byTarget(
-        poemId: 'poem1', kind: NotebookKind.lineNote, target: '0');
+      poemId: 'poem1',
+      kind: NotebookKind.lineNote,
+      target: '0',
+    );
     expect(hit?.id, e.id);
     expect(hit?.content['translation'], '直译内容');
 
     final miss = await repo.byTarget(
-        poemId: 'poem1', kind: NotebookKind.lineNote, target: '9');
+      poemId: 'poem1',
+      kind: NotebookKind.lineNote,
+      target: '9',
+    );
     expect(miss, isNull);
+  });
+
+  test('用户选词注本按位置独立缓存并可回读', () async {
+    final target = selectedWordNoteTarget(
+      lineIndex: 0,
+      start: 0,
+      end: 1,
+      term: '孤',
+    );
+    final e = entry(
+      id: notebookEntryId(
+        poemId: 'poem1',
+        kind: NotebookKind.wordNote,
+        target: target,
+      ),
+      kind: NotebookKind.wordNote,
+      target: target,
+      content: {
+        'term': '孤',
+        'explain': '独自',
+        'line_index': 0,
+        'start': 0,
+        'end': 1,
+        'source': 'selected',
+      },
+    );
+    await repo.upsert(e);
+
+    final hit = await repo.byTarget(
+      poemId: 'poem1',
+      kind: NotebookKind.wordNote,
+      target: target,
+    );
+    expect(hit?.kind, NotebookKind.wordNote);
+    expect(hit?.content['source'], 'selected');
+    expect(hit?.content['start'], 0);
   });
 
   test('同目标重复生成 → upsert 覆盖不重复', () async {
     final id = notebookEntryId(
-        poemId: 'poem1',
-        kind: NotebookKind.lineNote,
-        target: '0',
-      );
+      poemId: 'poem1',
+      kind: NotebookKind.lineNote,
+      target: '0',
+    );
     await repo.upsert(entry(id: id));
     await repo.upsert(entry(id: id, content: {'translation': '新版'}));
 

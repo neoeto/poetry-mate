@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/llm/annotation_service.dart';
@@ -25,10 +26,10 @@ const _lineNoteResponse = {
     {
       'message': {
         'content':
-            '{"translation":"月光洒在床前","notes":[{"term":"疑","explain":"好像"}]}'
-      }
-    }
-  ]
+            '{"translation":"月光洒在床前","notes":[{"term":"疑","pinyin":"yí","explain":"好像"}]}',
+      },
+    },
+  ],
 };
 
 void main() {
@@ -55,25 +56,24 @@ void main() {
     );
     service = AnnotationService(
       notebookRepository: notebook,
-      llmClient: LlmClient(
-        configStore: configStore,
-        transport: transport,
-      ),
-      personaService: PersonaService(
-        assets: _TestAssetBundle(),
-        prefs: prefs,
-      ),
+      llmClient: LlmClient(configStore: configStore, transport: transport),
+      personaService: PersonaService(assets: _TestAssetBundle(), prefs: prefs),
     );
   });
 
-  Future<void> pumpReader(WidgetTester tester, Poem poem,
-      {AnnotationService? annotationService}) async {
+  Future<void> pumpReader(
+    WidgetTester tester,
+    Poem poem, {
+    AnnotationService? annotationService,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           readingPrefsProvider.overrideWithValue(readingPrefs),
-          annotationServiceProvider
-              .overrideWithValue(annotationService ?? service),
+          notebookRepositoryProvider.overrideWithValue(notebook),
+          annotationServiceProvider.overrideWithValue(
+            annotationService ?? service,
+          ),
         ],
         child: MaterialApp(
           home: Scaffold(body: ReaderPage(poem: poem)),
@@ -93,12 +93,87 @@ void main() {
     expect(find.text('逐句即释 · 第 1 句'), findsOneWidget);
     expect(find.text('白话'), findsOneWidget);
     expect(find.text('月光洒在床前'), findsOneWidget);
-    expect(find.textContaining('疑：好像'), findsOneWidget);
+    expect(find.textContaining('疑（yí）：好像'), findsOneWidget);
     expect(transport.callCount, 1);
 
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('关闭'), findsNothing);
+  });
+
+  testWidgets('逐句关键词显示拼音并在原文中可点击', (tester) async {
+    final poem = testPoem(paragraphs: ['疑是地上霜。']);
+    await pumpReader(tester, poem);
+
+    await tester.tap(find.text('疑是地上霜。'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('疑（yí）：好像'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(const ValueKey('poem-line-0')),
+        matching: find.byType(RichText),
+      ),
+    );
+    final box = paragraph
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 1),
+        )
+        .single
+        .toRect();
+    await tester.tapAt(paragraph.localToGlobal(box.center));
+    await tester.pumpAndSettle();
+
+    expect(find.text('词语释义'), findsOneWidget);
+    expect(find.text('拼音：yí'), findsOneWidget);
+    expect(find.text('好像'), findsOneWidget);
+  });
+
+  testWidgets('已有逐句注缓存恢复关键词标记', (tester) async {
+    final poem = testPoem(paragraphs: ['疑是地上霜。']);
+    final entry = NotebookEntry(
+      id: notebookEntryId(
+        poemId: poem.id,
+        kind: NotebookKind.lineNote,
+        target: '0',
+      ),
+      poemId: poem.id,
+      kind: NotebookKind.lineNote,
+      target: '0',
+      content: {
+        'translation': '好像是地上的霜',
+        'notes': [
+          {'term': '疑', 'pinyin': 'yí', 'explain': '好像'},
+        ],
+      },
+      persona: 'zhiyin',
+      userEdited: false,
+      createdAt: DateTime(2026),
+      updatedAt: DateTime(2026),
+    );
+    await notebook.upsert(entry);
+    await pumpReader(tester, poem);
+
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(const ValueKey('poem-line-0')),
+        matching: find.byType(RichText),
+      ),
+    );
+    final box = paragraph
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 1),
+        )
+        .single
+        .toRect();
+    await tester.tapAt(paragraph.localToGlobal(box.center));
+    await tester.pumpAndSettle();
+
+    expect(find.text('词语释义'), findsOneWidget);
+    expect(find.text('拼音：yí'), findsOneWidget);
+    expect(transport.callCount, 0);
   });
 
   testWidgets('关闭后再次点击同一句命中缓存，不重复请求', (tester) async {
@@ -120,10 +195,80 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('长按正文选择词语显示 AI 解释菜单', (tester) async {
+    transport.jsonResult = {
+      'choices': [
+        {
+          'message': {
+            'content': '{"term":"灯","pinyin":"dēng","explain":"照明用的器具。"}',
+          },
+        },
+      ],
+    };
+    final poem = testPoem(paragraphs: ['孤灯不明思欲绝。']);
+    await pumpReader(tester, poem);
+
+    final paragraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(const ValueKey('poem-line-0')),
+        matching: find.byType(RichText),
+      ),
+    );
+    final localPosition = paragraph.getOffsetForCaret(
+      const TextPosition(offset: 1),
+      Rect.zero,
+    );
+    await tester.longPressAt(paragraph.localToGlobal(localPosition));
+    await tester.pumpAndSettle();
+
+    expect(paragraph.selections, isNotEmpty);
+    expect(find.text('AI 解释'), findsOneWidget);
+
+    await tester.tap(find.text('AI 解释'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选择「灯」'), findsOneWidget);
+    expect(find.text('拼音：dēng'), findsOneWidget);
+    expect(find.text('照明用的器具。'), findsOneWidget);
+    expect(transport.callCount, 1);
+
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+    final markedParagraph = tester.renderObject<RenderParagraph>(
+      find.descendant(
+        of: find.byKey(const ValueKey('poem-line-0')),
+        matching: find.byType(RichText),
+      ),
+    );
+    final markedBox = markedParagraph
+        .getBoxesForSelection(
+          const TextSelection(baseOffset: 1, extentOffset: 2),
+        )
+        .single
+        .toRect();
+    await tester.tapAt(markedParagraph.localToGlobal(markedBox.center));
+    await tester.pumpAndSettle();
+    expect(find.text('我选的词'), findsOneWidget);
+    expect(find.text('照明用的器具。'), findsOneWidget);
+    expect(find.text('编辑注本'), findsOneWidget);
+    expect(find.text('重新生成'), findsOneWidget);
+  });
+
   testWidgets('结构化解析失败后展示模型原文降级态', (tester) async {
     transport.jsonQueue.addAll([
-      {'choices': [{'message': {'content': '第一份非 JSON'}}]},
-      {'choices': [{'message': {'content': '第二份非 JSON'}}]},
+      {
+        'choices': [
+          {
+            'message': {'content': '第一份非 JSON'},
+          },
+        ],
+      },
+      {
+        'choices': [
+          {
+            'message': {'content': '第二份非 JSON'},
+          },
+        ],
+      },
     ]);
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);

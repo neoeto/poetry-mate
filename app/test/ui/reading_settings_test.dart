@@ -45,6 +45,14 @@ void main() {
     expect(find.text('28sp'), findsOneWidget);
   });
 
+  testWidgets('书架与注本入口已启用', (tester) async {
+    await pumpMine(tester);
+
+    expect(find.text('导入书架'), findsOneWidget);
+    expect(find.text('我的注本'), findsOneWidget);
+    expect(find.text('即将'), findsNothing);
+  });
+
   testWidgets('拖动滑杆即时更新内存偏好', (tester) async {
     await pumpMine(tester);
 

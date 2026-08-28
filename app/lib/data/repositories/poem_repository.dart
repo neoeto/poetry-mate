@@ -1,15 +1,20 @@
 /// 诗仓库 —— 数据访问唯一入口(UI 层不得直接执行 SQL)。
 ///
-/// v1 查询面刻意最小(spec: seed-library「诗实体经仓库访问」):
-/// 按 id 获取 / 按朝代类型列出 / 全量计数。
-/// **不提供关键词检索** —— FTS 属 search 变更,防止接口面提前扩张。
+/// 查询面: 按 id 获取 / 按朝代类型列出 / 关键词搜索 / 全量计数。
+/// 所有查询都只访问本地 SQLite，不依赖网络。
 
 library;
+
 import 'package:drift/drift.dart';
 
 import '../../core/db/app_database.dart';
 import '../../domain/entities/poem.dart';
 import '../mappers/poem_mapper.dart';
+
+String _escapeLike(String value) => value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('%', '\\%')
+    .replaceAll('_', '\\_');
 
 abstract class PoemRepository {
   /// 按 id 获取单首;不存在返回 null
@@ -26,6 +31,9 @@ abstract class PoemRepository {
     int limit = 50,
     int offset = 0,
   });
+
+  /// 按诗名、作者、词牌、正文或标签做本地关键词搜索。
+  Future<List<Poem>> search(String query, {int limit = 50, int offset = 0});
 
   /// 全量计数(导入向导与设置页展示用)
   Future<int> countAll();
@@ -64,7 +72,9 @@ class DriftPoemRepository implements PoemRepository {
         final conditions = <Expression<bool>>[];
         if (dynasty != null) conditions.add(t.dynasty.equals(dynasty));
         if (type != null) conditions.add(t.type.equals(type));
-        return conditions.isEmpty ? const Constant(true) : Expression.and(conditions);
+        return conditions.isEmpty
+            ? const Constant(true)
+            : Expression.and(conditions);
       })
       ..orderBy([
         (t) => OrderingTerm.desc(t.popularity),
@@ -72,6 +82,35 @@ class DriftPoemRepository implements PoemRepository {
       ])
       ..limit(limit, offset: offset);
     final rows = await query.get();
+    return rows.map(PoemMapper.fromRow).toList();
+  }
+
+  @override
+  Future<List<Poem>> search(
+    String query, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final keyword = query.trim();
+    if (keyword.isEmpty || limit <= 0) return [];
+
+    final pattern = '%${_escapeLike(keyword)}%';
+    final statement = _db.select(_db.poems)
+      ..where(
+        (t) => Expression.or([
+          t.title.like(pattern, escapeChar: '\\'),
+          t.author.like(pattern, escapeChar: '\\'),
+          t.rhythmic.like(pattern, escapeChar: '\\'),
+          t.paragraphsJson.like(pattern, escapeChar: '\\'),
+          t.tagsJson.like(pattern, escapeChar: '\\'),
+        ]),
+      )
+      ..orderBy([
+        (t) => OrderingTerm.desc(t.popularity),
+        (t) => OrderingTerm.asc(t.id),
+      ])
+      ..limit(limit, offset: offset < 0 ? 0 : offset);
+    final rows = await statement.get();
     return rows.map(PoemMapper.fromRow).toList();
   }
 

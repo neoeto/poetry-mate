@@ -21,12 +21,14 @@ class LineNoteSheet extends ConsumerStatefulWidget {
     required this.poem,
     required this.lineIndex,
     required this.line,
+    this.onNoteReady,
     this.onOpenSettings,
   });
 
   final Poem poem;
   final int lineIndex;
   final String line;
+  final ValueChanged<LineNoteContent>? onNoteReady;
   final VoidCallback? onOpenSettings;
 
   @override
@@ -42,11 +44,16 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
     _noteFuture = _load();
   }
 
-  Future<LineNoteContent> _load() {
-    return ref.read(annotationServiceProvider).getOrCreateLineNote(
+  Future<LineNoteContent> _load({bool forceRegenerate = false}) async {
+    final note = await ref
+        .read(annotationServiceProvider)
+        .getOrCreateLineNote(
           widget.poem,
           widget.lineIndex,
+          forceRegenerate: forceRegenerate,
         );
+    if (mounted) widget.onNoteReady?.call(note);
+    return note;
   }
 
   void _retry() {
@@ -56,7 +63,9 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
   }
 
   Future<NotebookEntry?> _entry() {
-    return ref.read(notebookRepositoryProvider).byTarget(
+    return ref
+        .read(notebookRepositoryProvider)
+        .byTarget(
           poemId: widget.poem.id,
           kind: NotebookKind.lineNote,
           target: widget.lineIndex.toString(),
@@ -79,11 +88,7 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
     );
     if (!confirmed || !mounted) return;
     setState(() {
-      _noteFuture = ref.read(annotationServiceProvider).getOrCreateLineNote(
-            widget.poem,
-            widget.lineIndex,
-            forceRegenerate: true,
-          );
+      _noteFuture = _load(forceRegenerate: true);
     });
   }
 
@@ -117,8 +122,8 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
               Text(
                 widget.line,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  color: scheme.onSurfaceVariant,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -208,7 +213,7 @@ class _LineNoteResult extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  '${item.term}：${item.explain.isEmpty ? '未提供释义。' : item.explain}',
+                  '${item.term}${item.pinyin.trim().isEmpty ? '' : '（${item.pinyin.trim()}）'}：${item.explain.isEmpty ? '未提供释义。' : item.explain}',
                   style: textTheme.bodyMedium,
                 ),
               ),
@@ -253,7 +258,8 @@ class _LineNoteError extends StatelessWidget {
         parseError.rawText.trim().isNotEmpty) {
       return _LineNotePlainFallback(rawText: parseError.rawText);
     }
-    final noKey = error is LlmException &&
+    final noKey =
+        error is LlmException &&
         (error! as LlmException).kind == LlmErrorKind.noKey;
     if (noKey) {
       return _NoKeyGuide(onOpenSettings: onOpenSettings);
@@ -299,8 +305,10 @@ class _LineNotePlainFallback extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('结构化解析失败，先展示模型原文',
-              style: Theme.of(context).textTheme.labelLarge),
+          Text(
+            '结构化解析失败，先展示模型原文',
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
           const SizedBox(height: 8),
           SelectableText(rawText),
         ],
@@ -349,6 +357,7 @@ Future<void> showLineNoteSheet(
   required Poem poem,
   required int lineIndex,
   required String line,
+  ValueChanged<LineNoteContent>? onNoteReady,
   VoidCallback? onOpenSettings,
 }) {
   return showModalBottomSheet<void>(
@@ -359,6 +368,7 @@ Future<void> showLineNoteSheet(
       poem: poem,
       lineIndex: lineIndex,
       line: line,
+      onNoteReady: onNoteReady,
       onOpenSettings: onOpenSettings,
     ),
   );

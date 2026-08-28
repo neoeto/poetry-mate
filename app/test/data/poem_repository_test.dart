@@ -20,6 +20,8 @@ void main() {
     String type = 'shi',
     double? popularity = 10.0,
     List<String>? tags,
+    List<String> paragraphs = const ['床前看月光。'],
+    String? rhythmic,
   }) {
     return Poem(
       id: id,
@@ -27,11 +29,11 @@ void main() {
       title: title,
       dynasty: dynasty,
       type: type,
-      paragraphs: ['床前看月光。'],
+      paragraphs: paragraphs,
       preface: null,
-      rhythmic: null,
+      rhythmic: rhythmic,
       popularity: popularity,
-      rawText: ['床前看月光。'],
+      rawText: paragraphs,
       tags: tags,
       sourceCollection: 'seed',
     );
@@ -54,15 +56,14 @@ void main() {
   });
 
   test('listByDynastyAndType: 双维过滤 + 热度降序', () async {
-    Future<void> seed(Poem p) async =>
-        db.into(db.poems).insert(PoemMapper.toCompanion(p), mode: InsertMode.insertOrIgnore);
+    Future<void> seed(Poem p) async => db
+        .into(db.poems)
+        .insert(PoemMapper.toCompanion(p), mode: InsertMode.insertOrIgnore);
 
     await seed(fixture(id: 'a', dynasty: '唐', popularity: 5));
     await seed(fixture(id: 'b', dynasty: '唐', popularity: 9));
     await seed(fixture(id: 'c', dynasty: '宋', type: 'ci', popularity: 99));
-    await seed(
-      fixture(id: 'd', dynasty: '唐', popularity: null),
-    );
+    await seed(fixture(id: 'd', dynasty: '唐', popularity: null));
 
     final tang = await repo.listByDynastyAndType(dynasty: '唐');
     expect(tang.map((p) => p.id).toList(), ['b', 'a', 'd']); // 热度降序,null 最后
@@ -74,12 +75,65 @@ void main() {
     expect(limited, hasLength(2));
   });
 
+  test('search: 按标题、作者、词牌、正文和标签命中', () async {
+    await db
+        .into(db.poems)
+        .insert(
+          PoemMapper.toCompanion(
+            fixture(
+              id: 'title',
+              title: '静夜思',
+              paragraphs: ['床前明月光。'],
+              tags: const ['思乡'],
+            ),
+          ),
+        );
+    await db
+        .into(db.poems)
+        .insert(
+          PoemMapper.toCompanion(
+            fixture(
+              id: 'author',
+              author: '苏轼',
+              title: '水调歌头',
+              paragraphs: ['明月几时有。'],
+              rhythmic: '水调歌头',
+            ),
+          ),
+        );
+
+    expect((await repo.search('静夜思')).single.id, 'title');
+    expect((await repo.search('苏轼')).single.id, 'author');
+    expect((await repo.search('水调')).single.id, 'author');
+    expect((await repo.search('明月几时')).single.id, 'author');
+    expect((await repo.search('思乡')).single.id, 'title');
+    expect(await repo.search('   '), isEmpty);
+  });
+
+  test('search: 特殊 LIKE 字符按字面匹配且结果受 limit 限制', () async {
+    for (final id in ['a', 'b', 'c']) {
+      await db
+          .into(db.poems)
+          .insert(PoemMapper.toCompanion(fixture(id: id, paragraphs: ['春风。'])));
+    }
+
+    expect(await repo.search('%'), isEmpty);
+    expect((await repo.search('春', limit: 2)), hasLength(2));
+    expect((await repo.search('春', limit: 2)).map((poem) => poem.id), [
+      'a',
+      'b',
+    ]);
+  });
+
   test('countAll: 全量计数', () async {
     expect(await repo.countAll(), 0);
     for (final id in ['a', 'b', 'c']) {
       await db
           .into(db.poems)
-          .insert(PoemMapper.toCompanion(fixture(id: id)), mode: InsertMode.insertOrIgnore);
+          .insert(
+            PoemMapper.toCompanion(fixture(id: id)),
+            mode: InsertMode.insertOrIgnore,
+          );
     }
     expect(await repo.countAll(), 3);
   });

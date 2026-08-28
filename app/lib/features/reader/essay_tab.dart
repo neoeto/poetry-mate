@@ -19,10 +19,12 @@ class EssayTab extends ConsumerStatefulWidget {
   const EssayTab({
     super.key,
     required this.poem,
+    this.onContentReady,
     this.onOpenSettings,
   });
 
   final Poem poem;
+  final ValueChanged<EssayContent>? onContentReady;
   final VoidCallback? onOpenSettings;
 
   @override
@@ -42,8 +44,12 @@ class _EssayTabState extends ConsumerState<EssayTab>
     _essayFuture = _load();
   }
 
-  Future<EssayContent> _load() {
-    return ref.read(annotationServiceProvider).getOrCreateEssay(widget.poem);
+  Future<EssayContent> _load({bool forceRegenerate = false}) async {
+    final essay = await ref
+        .read(annotationServiceProvider)
+        .getOrCreateEssay(widget.poem, forceRegenerate: forceRegenerate);
+    if (mounted) widget.onContentReady?.call(essay);
+    return essay;
   }
 
   void _retry() {
@@ -53,10 +59,9 @@ class _EssayTabState extends ConsumerState<EssayTab>
   }
 
   Future<NotebookEntry?> _entry() {
-    return ref.read(notebookRepositoryProvider).byTarget(
-          poemId: widget.poem.id,
-          kind: NotebookKind.essay,
-        );
+    return ref
+        .read(notebookRepositoryProvider)
+        .byTarget(poemId: widget.poem.id, kind: NotebookKind.essay);
   }
 
   Future<void> _edit() async {
@@ -75,10 +80,7 @@ class _EssayTabState extends ConsumerState<EssayTab>
     );
     if (!confirmed || !mounted) return;
     setState(() {
-      _essayFuture = ref.read(annotationServiceProvider).getOrCreateEssay(
-            widget.poem,
-            forceRegenerate: true,
-          );
+      _essayFuture = _load(forceRegenerate: true);
     });
   }
 
@@ -190,10 +192,7 @@ class EssayContentView extends StatelessWidget {
               ],
             ),
           ),
-        _EssaySection(
-          title: '大意',
-          child: _EssayText(content.summary),
-        ),
+        _EssaySection(title: '大意', child: _EssayText(content.summary)),
         _EssaySection(
           title: '炼字与手法',
           child: content.craft.isEmpty
@@ -210,9 +209,7 @@ class EssayContentView extends StatelessWidget {
                             if (item.point.isNotEmpty)
                               Text(
                                 item.point,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall,
+                                style: Theme.of(context).textTheme.titleSmall,
                               ),
                             if (item.detail.isNotEmpty) ...[
                               if (item.point.isNotEmpty)
@@ -225,14 +222,24 @@ class EssayContentView extends StatelessWidget {
                   ],
                 ),
         ),
-        _EssaySection(
-          title: '意境',
-          child: _EssayText(content.mood),
-        ),
-        _EssaySection(
-          title: '情感',
-          child: _EssayText(content.emotion),
-        ),
+        if (content.wordNotes.isNotEmpty)
+          _EssaySection(
+            title: '词语解释',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final note in content.wordNotes)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Text(
+                      '${note.term}${note.pinyin.trim().isEmpty ? '' : '（${note.pinyin.trim()}）'}：${note.explain}',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        _EssaySection(title: '意境', child: _EssayText(content.mood)),
+        _EssaySection(title: '情感', child: _EssayText(content.emotion)),
         _EssaySection(
           title: '创作背景',
           child: Column(
@@ -296,11 +303,7 @@ class _EmptyEssayText extends StatelessWidget {
 }
 
 class _EssayError extends StatelessWidget {
-  const _EssayError({
-    this.error,
-    required this.onRetry,
-    this.onOpenSettings,
-  });
+  const _EssayError({this.error, required this.onRetry, this.onOpenSettings});
 
   final Object? error;
   final VoidCallback onRetry;
@@ -313,7 +316,8 @@ class _EssayError extends StatelessWidget {
         parseError.rawText.trim().isNotEmpty) {
       return _EssayPlainFallback(rawText: parseError.rawText);
     }
-    final noKey = error is LlmException &&
+    final noKey =
+        error is LlmException &&
         (error! as LlmException).kind == LlmErrorKind.noKey;
     if (noKey) {
       return _EssayNoKeyGuide(onOpenSettings: onOpenSettings);
@@ -358,8 +362,7 @@ class _EssayPlainFallback extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('结构化解析失败，先展示模型原文',
-            style: Theme.of(context).textTheme.titleSmall),
+        Text('结构化解析失败，先展示模型原文', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 10),
         SelectableText(rawText),
       ],

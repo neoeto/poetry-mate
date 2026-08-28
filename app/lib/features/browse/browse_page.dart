@@ -4,12 +4,15 @@
 /// 点击进入阅读页深链 /poem/:id。
 
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/providers.dart';
+import '../../domain/entities/poem.dart';
 import 'browse_filters.dart';
+import 'poem_search_delegate.dart';
 
 class BrowsePage extends ConsumerWidget {
   const BrowsePage({super.key});
@@ -20,7 +23,24 @@ class BrowsePage extends ConsumerWidget {
     final poemsAsync = ref.watch(filteredPoemsProvider(selected));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('分类')),
+      appBar: AppBar(
+        title: const Text('分类'),
+        actions: [
+          IconButton(
+            tooltip: '搜索诗词',
+            icon: const Icon(Icons.search),
+            onPressed: () async {
+              final poem = await showSearch<Poem>(
+                context: context,
+                delegate: PoemSearchDelegate(ref.read(poemRepositoryProvider)),
+              );
+              if (context.mounted && poem != null) {
+                context.push('/poem/${poem.id}');
+              }
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           // ── 过滤 chips ──
@@ -62,8 +82,10 @@ class BrowsePage extends ConsumerWidget {
                       ),
                       subtitle: Text('${poem.author} · ${poem.dynasty}'),
                       trailing: poem.popularity != null
-                          ? Text(poem.popularity!.toStringAsFixed(1),
-                              style: Theme.of(context).textTheme.labelSmall)
+                          ? Text(
+                              poem.popularity!.toStringAsFixed(1),
+                              style: Theme.of(context).textTheme.labelSmall,
+                            )
                           : null,
                       onTap: () => context.push('/poem/${poem.id}'),
                     );

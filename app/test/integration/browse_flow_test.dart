@@ -2,6 +2,7 @@
 // 对应 specs/app-foundation「分类页可浏览种子集」与 specs/seed-library 场景。
 import 'package:drift/drift.dart' show InsertMode;
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:poetry_mate/core/db/app_database.dart';
@@ -38,7 +39,10 @@ void main() {
     for (final poem in poems) {
       await db
           .into(db.poems)
-          .insert(PoemMapper.toCompanion(poem), mode: InsertMode.insertOrIgnore);
+          .insert(
+            PoemMapper.toCompanion(poem),
+            mode: InsertMode.insertOrIgnore,
+          );
     }
 
     await tester.pumpWidget(
@@ -71,6 +75,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('水调数声持酒听'), findsOneWidget);
     expect(find.text('张先 · 宋'), findsOneWidget);
+  });
+
+  testWidgets('分类页搜索诗名并进入阅读页', (tester) async {
+    final poem = testPoem(
+      id: 'search-poem',
+      title: '静夜思',
+      paragraphs: ['床前明月光。'],
+    );
+    await db
+        .into(db.poems)
+        .insert(PoemMapper.toCompanion(poem), mode: InsertMode.insertOrIgnore);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          readingPrefsProvider.overrideWithValue(InMemoryReadingPrefs()),
+        ],
+        child: const PoetryMateApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('分类'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('搜索诗词'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), '静夜思');
+    await tester.pumpAndSettle();
+
+    expect(find.text('静夜思'), findsNWidgets(2));
+    expect(find.textContaining('李白 · 唐'), findsOneWidget);
+    await tester.tap(find.text('静夜思').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('床前明月光。'), findsOneWidget);
   });
 
   testWidgets('空库启动: 分类页显示空态而非崩溃', (tester) async {

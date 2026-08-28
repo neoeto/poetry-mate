@@ -7,6 +7,7 @@ library;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/compression/zstd_codec.dart';
 import '../core/db/app_database.dart';
 import '../features/browse/browse_filters.dart';
 import '../domain/entities/poem.dart';
@@ -17,6 +18,8 @@ import 'preferences/reading_prefs.dart';
 import 'repositories/favorites_repository.dart';
 import 'repositories/notebook_repository.dart';
 import 'repositories/poem_repository.dart';
+import 'library/library_data_source.dart';
+import 'library/library_import_service.dart';
 
 /// 由 main() overrideWithValue 注入;未注入即用 = 编程错误
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -54,6 +57,23 @@ final poemByIdProvider =
 
 final notebookRepositoryProvider = Provider<NotebookRepository>(
     (ref) => DriftNotebookRepository(ref.watch(appDatabaseProvider)));
+
+final libraryImportVersionStoreProvider =
+    Provider<PrefsLibraryImportVersionStore>((ref) {
+  return PrefsLibraryImportVersionStore(ref.watch(prefsStoreProvider));
+});
+
+final libraryImportServiceProvider =
+    Provider.family<LibraryImportService, String>((ref, baseUrl) {
+  final service = LibraryImportService(
+    source: HttpLibraryDataSource(baseUrl: baseUrl),
+    db: ref.watch(appDatabaseProvider),
+    versions: ref.watch(libraryImportVersionStoreProvider),
+    decompress: esZstdDecompress,
+  );
+  ref.onDispose(service.close);
+  return service;
+});
 
 final favoritesRepositoryProvider = Provider<FavoritesRepository>(
     (ref) => DriftFavoritesRepository(ref.watch(appDatabaseProvider)));
