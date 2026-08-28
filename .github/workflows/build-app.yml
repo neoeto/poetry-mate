@@ -142,6 +142,9 @@ jobs:
   ios:
     name: iOS IPA
     runs-on: macos-latest
+    env:
+      # secrets 上下文不能用于 step 的 if 表达式,通过 job 级 env 透传
+      APPLE_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
 
@@ -172,7 +175,7 @@ jobs:
       # 未配置 Apple 签名密钥时,打未签名 device .app 与 .ipa;
       # 它们可以被开发者后续自行签名/重签名后安装或分发。
       - name: Build iOS (unsigned)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 == '' }}
+        if: ${{ env.APPLE_CERT == '' }}
         working-directory: app
         run: |
           set -euo pipefail
@@ -185,9 +188,8 @@ jobs:
 
       # 配置 Apple 签名密钥时,导入证书与描述文件并产出正式签名 IPA。
       - name: Configure iOS signing
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        if: ${{ env.APPLE_CERT != '' }}
         env:
-          APPLE_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           APPLE_CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
           PROVISIONING_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
           TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
@@ -230,7 +232,7 @@ jobs:
           PLIST
 
       - name: Build iOS (signed)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        if: ${{ env.APPLE_CERT != '' }}
         working-directory: app
         run: |
           set -euo pipefail
