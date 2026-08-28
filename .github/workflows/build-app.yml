@@ -42,6 +42,10 @@ on:
         description: "构建前运行 flutter analyze + flutter test"
         type: boolean
         default: true
+      release_tag:
+        description: "发布到 GitHub Release 的 tag(如 v1.0.0;留空则不发布,只留 Artifacts)"
+        required: false
+        default: ""
   push:
     tags:
       - "v*"
@@ -256,3 +260,68 @@ jobs:
             app/build/ios/ipa/*.ipa
           if-no-files-found: warn
           retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: poetry-mate-android
+          path: artifacts/android
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: poetry-mate-ios
+          path: artifacts/ios
+
+      - name: Publish to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # 确定发布 tag: tag push 事件用 ref_name;手动触发用 release_tag 输入。
+          TAG=""
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.release_tag }}"
+          fi
+          if [[ -z "$TAG" ]]; then
+            echo "未提供 tag,跳过 GitHub Release 发布(产物保留在 Artifacts)。"
+            exit 0
+          fi
+
+          # 收集可安装产物: APK/AAB/IPA,以及打包成 zip 的 iOS .app
+          mapfile -t FILES < <(
+            find artifacts -type f \( -name '*.apk' -o -name '*.aab' -o -name '*.ipa' \) | sort
+          )
+          APP_DIR="$(find artifacts -type d -name '*.app' | head -n 1 || true)"
+          if [[ -n "$APP_DIR" ]]; then
+            (
+              cd "$(dirname "$APP_DIR")"
+              zip -q -r "$RUNNER_TEMP/poetry-mate-ios-app.zip" "$(basename "$APP_DIR")"
+            )
+            FILES+=("$RUNNER_TEMP/poetry-mate-ios-app.zip")
+          fi
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "没有可发布的产物文件"
+            exit 1
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            for f in "${FILES[@]}"; do
+              gh release upload "$TAG" "$f" --clobber
+            done
+            echo "已更新已有 Release: $TAG"
+          else
+            gh release create "$TAG" "${FILES[@]}" \
+              --generate-notes --title "Poetry Mate $TAG"
+            echo "已创建 Release: $TAG"
+          fi
