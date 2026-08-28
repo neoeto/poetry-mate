@@ -1,9 +1,26 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// 发布签名(可选):
+//   本地开发无需配置,release 回退到 debug 签名,产物仍可直接安装;
+//   正式发布在 android/key.properties 提供 keystore(不入库),或由 CI 注入。
+const val KEY_PROPS_FILE = "key.properties"
+
+val signing = Properties()
+val signingFile = rootProject.file(KEY_PROPS_FILE)
+if (signingFile.exists()) {
+    signingFile.inputStream().use(signing::load)
+}
+val hasSigning = signing.getProperty("storeFile") != null &&
+    signing.getProperty("storePassword") != null &&
+    signing.getProperty("keyAlias") != null &&
+    signing.getProperty("keyPassword") != null
 
 android {
     namespace = "com.poetrymate.poetry_mate"
@@ -30,11 +47,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasSigning) {
+            create("release") {
+                keyAlias = signing.getProperty("keyAlias")
+                keyPassword = signing.getProperty("keyPassword")
+                storeFile = rootProject.file(signing.getProperty("storeFile")!!)
+                storePassword = signing.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 配置了 key.properties 则使用正式签名,否则回退 debug 签名(可直接安装)。
+            signingConfig = if (hasSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

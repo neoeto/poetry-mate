@@ -1,0 +1,253 @@
+# Poetry Mate APP 打包流水线
+#
+# 产出:
+#   - Android: release APK(可选 AAB) —— 有 keystore 则正式签名,否则 debug 签名(可直接安装)
+#   - iOS: 未签名 device .app + .ipa(无需任何 Apple 密钥);提供 Apple 签名密钥后可产出正式签名 IPA
+#
+# 触发:
+#   - 手动 workflow_dispatch(可指定数据源地址 / 是否打 AAB / 是否跳过测试)
+#   - 推送 v* tag 自动构建
+#
+# 可选 secrets(不配置也能构建出可安装包):
+#   Android 签名:
+#     ANDROID_KEYSTORE_BASE64   —— keystore 文件的 base64(如 base64 -i key.jks)
+#     ANDROID_KEYSTORE_PASSWORD —— storePassword
+#     ANDROID_KEY_ALIAS         —— keyAlias
+#     ANDROID_KEY_PASSWORD      —— keyPassword
+#   iOS 签名(不配置则产出未签名 ipa):
+#     IOS_CERTIFICATE_BASE64         —— Apple 分发证书 .p12 的 base64
+#     IOS_CERTIFICATE_PASSWORD       —— .p12 密码
+#     IOS_PROVISIONING_PROFILE_BASE64 —— .mobileprovision 的 base64
+#     IOS_TEAM_ID                    —— Apple Developer Team ID
+#     IOS_EXPORT_METHOD              —— app-store-connect / ad-hoc / development(默认 ad-hoc)
+#
+# 说明:
+#   - iOS 构建必须在 macOS runner 上执行;Android 在 ubuntu 上执行。
+#   - 产物通过 Actions Artifact 下载,保留 14 天。
+
+name: build-app
+
+on:
+  workflow_dispatch:
+    inputs:
+      data_url:
+        description: "数据源根地址,作为 --dart-define=POETRY_MATE_DATA_URL 注入(留空则不注入)"
+        required: false
+        default: ""
+      build_appbundle:
+        description: "同时构建 Android App Bundle(.aab)"
+        type: boolean
+        default: false
+      run_tests:
+        description: "构建前运行 flutter analyze + flutter test"
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: build-app-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATA_URL: ${{ inputs.data_url || '' }}
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter
+        run: flutter --version
+
+      - name: Pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        if: ${{ inputs.run_tests != false }}
+        working-directory: app
+        run: flutter analyze
+
+      - name: Test
+        if: ${{ inputs.run_tests != false }}
+        working-directory: app
+        run: flutter test
+
+      # 注入发布签名: 提供 ANDROID_KEYSTORE_BASE64 时生成 key.properties,
+      # build.gradle.kts 检测到后自动使用正式签名;否则回退 debug 签名。
+      - name: Configure Android release signing (optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${KEYSTORE_B64:-}" ]]; then
+            echo "未配置 ANDROID_KEYSTORE_BASE64,release 将使用 debug 签名(可直接安装)"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > app/android/key.jks
+          cat > app/android/key.properties <<EOF
+          storeFile=key.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build APK
+        working-directory: app
+        run: |
+          set -euo pipefail
+          DEFINES=()
+          if [[ -n "$DATA_URL" ]]; then
+            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+          fi
+          flutter build apk --release "${DEFINES[@]}"
+
+      - name: Build App Bundle (optional)
+        if: ${{ inputs.build_appbundle == true }}
+        working-directory: app
+        run: |
+          DEFINES=()
+          if [[ -n "$DATA_URL" ]]; then
+            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+          fi
+          flutter build appbundle --release "${DEFINES[@]}"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poetry-mate-android
+          path: |
+            app/build/app/outputs/flutter-apk/*.apk
+            app/build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iOS IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter & Xcode
+        run: |
+          flutter --version
+          xcodebuild -version
+
+      - name: Pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Analyze
+        if: ${{ inputs.run_tests != false }}
+        working-directory: app
+        run: flutter analyze
+
+      - name: Test
+        if: ${{ inputs.run_tests != false }}
+        working-directory: app
+        run: flutter test
+
+      # 未配置 Apple 签名密钥时,打未签名 device .app 与 .ipa;
+      # 它们可以被开发者后续自行签名/重签名后安装或分发。
+      - name: Build iOS (unsigned)
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 == '' }}
+        working-directory: app
+        run: |
+          set -euo pipefail
+          DEFINES=()
+          if [[ -n "$DATA_URL" ]]; then
+            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+          fi
+          flutter build ios --release --no-codesign "${DEFINES[@]}"
+          flutter build ipa --release --no-codesign "${DEFINES[@]}"
+
+      # 配置 Apple 签名密钥时,导入证书与描述文件并产出正式签名 IPA。
+      - name: Configure iOS signing
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        env:
+          APPLE_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROVISIONING_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          EXPORT_METHOD: ${{ secrets.IOS_EXPORT_METHOD }}
+        run: |
+          set -euo pipefail
+          : "${APPLE_CERT_PASSWORD:?IOS_CERTIFICATE_PASSWORD 未配置}"
+          : "${PROVISIONING_B64:?IOS_PROVISIONING_PROFILE_BASE64 未配置}"
+          : "${TEAM_ID:?IOS_TEAM_ID 未配置}"
+
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          printf '%s' "$APPLE_CERT" | base64 --decode > "$CERT_PATH"
+
+          # 描述文件放入系统目录
+          PROFILE_UUID=$(uuidgen)
+          printf '%s' "$PROVISIONING_B64" | base64 --decode \
+            > "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          # 导入证书到钥匙串
+          KEYCHAIN="$RUNNER_TEMP/app-signing.keychain-db"
+          security create-keychain -p temp "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p temp "$KEYCHAIN"
+          security import "$CERT_PATH" -P "$APPLE_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k temp "$KEYCHAIN"
+
+          # 生成 export options
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>${EXPORT_METHOD:-ad-hoc}</string>
+            <key>teamID</key>
+            <string>$TEAM_ID</string>
+          </dict>
+          </plist>
+          PLIST
+
+      - name: Build iOS (signed)
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        working-directory: app
+        run: |
+          set -euo pipefail
+          DEFINES=()
+          if [[ -n "$DATA_URL" ]]; then
+            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+          fi
+          flutter build ipa --release \
+            --export-options-plist="$RUNNER_TEMP/ExportOptions.plist" \
+            "${DEFINES[@]}"
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poetry-mate-ios
+          path: |
+            app/build/ios/iphoneos/*.app
+            app/build/ios/ipa/*.ipa
+          if-no-files-found: warn
+          retention-days: 14

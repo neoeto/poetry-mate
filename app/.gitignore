@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 发布签名(本地不入库;CI 通过 secrets 注入)
+/android/key.properties
+/android/key.jks
+/android/*.keystore
+/android/ExportOptions.plist
