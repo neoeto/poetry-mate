@@ -2,6 +2,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/llm/annotation_service.dart';
@@ -66,6 +67,30 @@ void main() {
     expect(service.calls, 1);
     expect(service.lastPoem?.bodyText, poem.bodyText);
     expect(service.lastQuestion, '为什么写月光？');
+  });
+
+  testWidgets('助手回答按 Markdown 格式渲染', (tester) async {
+    final service = _FakeChatService([
+      const ChatDelta('# 意境\n\n**月光**映在窗前。\n\n- 清冷\n- 宁静'),
+    ]);
+    await pumpChat(tester, service);
+
+    await tester.enterText(find.byType(TextField), '请分析意境');
+    await tester.tap(find.byIcon(Icons.send));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(MarkdownBody), findsOneWidget);
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    expect(markdown.softLineBreak, isTrue);
+    expect(markdown.data, contains('**月光**'));
+
+    final renderedText = tester
+        .widgetList<RichText>(find.byType(RichText))
+        .map((widget) => widget.text.toPlainText())
+        .join('\\n');
+    expect(renderedText, contains('月光映在窗前。'));
+    expect(renderedText, contains('清冷'));
+    expect(renderedText, isNot(contains('**')));
   });
 
   testWidgets('fallback replace=true 会替换半截流而非重复追加', (tester) async {

@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/llm/llm_exception.dart';
@@ -253,10 +254,92 @@ class _ChatBubble extends StatelessWidget {
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : Text(text, style: TextStyle(color: foreground)),
+            : fromUser
+                ? Text(text, style: TextStyle(color: foreground))
+                : MarkdownBody(
+                    data: text,
+                    // 流式回答中的单换行也要保留，便于阅读诗句和分点。
+                    softLineBreak: true,
+                    styleSheet: _chatMarkdownStyle(context, foreground),
+                  ),
       ),
     );
   }
+}
+
+MarkdownStyleSheet _chatMarkdownStyle(
+  BuildContext context,
+  Color foreground,
+) {
+  final theme = Theme.of(context);
+  final body = theme.textTheme.bodyMedium!.copyWith(
+    color: foreground,
+    height: 1.5,
+  );
+  final bodySize = body.fontSize ?? 14;
+  final codeBackground = foreground.withValues(alpha: 0.08);
+
+  return MarkdownStyleSheet.fromTheme(theme).copyWith(
+    a: body.copyWith(
+      color: theme.colorScheme.primary,
+      decoration: TextDecoration.underline,
+    ),
+    p: body,
+    h1: body.copyWith(
+      fontSize: bodySize + 5,
+      fontWeight: FontWeight.w700,
+      height: 1.25,
+    ),
+    h2: body.copyWith(
+      fontSize: bodySize + 3,
+      fontWeight: FontWeight.w700,
+      height: 1.3,
+    ),
+    h3: body.copyWith(
+      fontSize: bodySize + 1,
+      fontWeight: FontWeight.w700,
+      height: 1.35,
+    ),
+    h4: body.copyWith(fontWeight: FontWeight.w700),
+    h5: body.copyWith(fontWeight: FontWeight.w700),
+    h6: body.copyWith(fontWeight: FontWeight.w700),
+    em: body.copyWith(fontStyle: FontStyle.italic),
+    strong: body.copyWith(fontWeight: FontWeight.w700),
+    del: body.copyWith(decoration: TextDecoration.lineThrough),
+    blockquote: body,
+    listBullet: body,
+    tableHead: body.copyWith(fontWeight: FontWeight.w700),
+    tableBody: body,
+    code: body.copyWith(
+      fontFamily: 'monospace',
+      fontSize: bodySize * 0.9,
+      backgroundColor: codeBackground,
+    ),
+    codeblockPadding: const EdgeInsets.all(10),
+    codeblockDecoration: BoxDecoration(
+      color: codeBackground,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    blockquotePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    blockquoteDecoration: BoxDecoration(
+      color: foreground.withValues(alpha: 0.05),
+      border: Border(
+        left: BorderSide(
+          color: theme.colorScheme.primary,
+          width: 3,
+        ),
+      ),
+      borderRadius: BorderRadius.circular(3),
+    ),
+    blockSpacing: 6,
+    pPadding: EdgeInsets.zero,
+    h1Padding: EdgeInsets.zero,
+    h2Padding: EdgeInsets.zero,
+    h3Padding: EdgeInsets.zero,
+    h4Padding: EdgeInsets.zero,
+    h5Padding: EdgeInsets.zero,
+    h6Padding: EdgeInsets.zero,
+  );
 }
 
 class _ChatError extends StatelessWidget {
