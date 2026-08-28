@@ -113,21 +113,22 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          DEFINES=()
+          CMD=(flutter build apk --release)
           if [[ -n "$DATA_URL" ]]; then
-            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+            CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
           fi
-          flutter build apk --release "${DEFINES[@]}"
+          "${CMD[@]}"
 
       - name: Build App Bundle (optional)
         if: ${{ inputs.build_appbundle == true }}
         working-directory: app
         run: |
-          DEFINES=()
+          set -euo pipefail
+          CMD=(flutter build appbundle --release)
           if [[ -n "$DATA_URL" ]]; then
-            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+            CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
           fi
-          flutter build appbundle --release "${DEFINES[@]}"
+          "${CMD[@]}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -179,12 +180,16 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          DEFINES=()
+          CMD=(flutter build ios --release --no-codesign)
           if [[ -n "$DATA_URL" ]]; then
-            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+            CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
           fi
-          flutter build ios --release --no-codesign "${DEFINES[@]}"
-          flutter build ipa --release --no-codesign "${DEFINES[@]}"
+          "${CMD[@]}"
+          CMD=(flutter build ipa --release --no-codesign)
+          if [[ -n "$DATA_URL" ]]; then
+            CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+          fi
+          "${CMD[@]}"
 
       # 配置 Apple 签名密钥时,导入证书与描述文件并产出正式签名 IPA。
       - name: Configure iOS signing
@@ -236,13 +241,11 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          DEFINES=()
+          CMD=(flutter build ipa --release --export-options-plist="$RUNNER_TEMP/ExportOptions.plist")
           if [[ -n "$DATA_URL" ]]; then
-            DEFINES+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
+            CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
           fi
-          flutter build ipa --release \
-            --export-options-plist="$RUNNER_TEMP/ExportOptions.plist" \
-            "${DEFINES[@]}"
+          "${CMD[@]}"
 
       - name: Upload iOS artifact
         uses: actions/upload-artifact@v4
