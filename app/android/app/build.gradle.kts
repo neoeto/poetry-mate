@@ -10,7 +10,8 @@ plugins {
 // 发布签名(可选):
 //   本地开发无需配置,release 回退到 debug 签名,产物仍可直接安装;
 //   正式发布在 android/key.properties 提供 keystore(不入库),或由 CI 注入。
-const val KEY_PROPS_FILE = "key.properties"
+// 注意: 脚本顶层不能用 const val,用普通 val。
+val KEY_PROPS_FILE = "key.properties"
 
 val signing = Properties()
 val signingFile = rootProject.file(KEY_PROPS_FILE)
@@ -32,9 +33,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
+    // Kotlin 编译目标改用 compilerOptions DSL(kotlinOptions.jvmTarget 字符串写法已弃用)
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
@@ -67,6 +66,12 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
