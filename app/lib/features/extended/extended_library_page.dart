@@ -9,6 +9,7 @@ import '../../core/llm/annotation_service.dart';
 import '../../data/extended/poem_fingerprint.dart';
 import '../../data/providers.dart';
 import '../../domain/entities/extended_poem.dart';
+import '../poem_deletion_dialog.dart';
 import '../reader/poem_route_page.dart';
 
 class ExtendedLibraryPage extends ConsumerWidget {
@@ -54,7 +55,18 @@ class ExtendedLibraryPage extends ConsumerWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            key: ValueKey('delete-extended-poem-${poem.id}'),
+                            tooltip: '删除诗词',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _deletePoem(context, ref, poem),
+                          ),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
                       onTap: () => context.push('/extended-poem/${poem.id}'),
                     );
                   },
@@ -62,6 +74,30 @@ class ExtendedLibraryPage extends ConsumerWidget {
               ),
       ),
     );
+  }
+
+  Future<void> _deletePoem(
+    BuildContext context,
+    WidgetRef ref,
+    ExtendedPoem poem,
+  ) async {
+    final confirmed = await confirmPoemDeletion(context, title: poem.title);
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      await ref.read(extendedPoemRepositoryProvider).delete(poem.id);
+      ref.invalidate(visibleExtendedPoemsProvider);
+      ref.invalidate(extendedPoemByIdProvider(poem.id));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已从本地诗库删除')));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败：$error')));
+    }
   }
 }
 
@@ -116,6 +152,16 @@ class ExtendedPoemRoutePage extends ConsumerWidget {
               poem: value.toPoem(),
               sourceInfo: value.sourceInfo,
               showFavorite: false,
+              onDelete: () async {
+                await ref
+                    .read(extendedPoemRepositoryProvider)
+                    .delete(value.id);
+                ref.invalidate(visibleExtendedPoemsProvider);
+                ref.invalidate(extendedPoemByIdProvider(value.id));
+                if (context.mounted) {
+                  await Navigator.of(context).maybePop();
+                }
+              },
             ),
     );
   }

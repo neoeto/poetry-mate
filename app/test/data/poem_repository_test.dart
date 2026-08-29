@@ -55,6 +55,23 @@ void main() {
     expect(await repo.byId('missing'), isNull);
   });
 
+  test('delete: 删除本地诗词并清理对应收藏关系', () async {
+    final poem = fixture(id: 'delete-me');
+    await db.into(db.poems).insert(PoemMapper.toCompanion(poem));
+    await db.into(db.favorites).insert(
+          FavoritesCompanion.insert(
+            poemId: poem.id,
+            createdAt: DateTime.now().millisecondsSinceEpoch,
+          ),
+        );
+
+    await repo.delete(poem.id);
+
+    expect(await repo.byId(poem.id), isNull);
+    expect(await repo.countAll(), 0);
+    expect(await db.select(db.favorites).get(), isEmpty);
+  });
+
   test('listByDynastyAndType: 双维过滤 + 热度降序', () async {
     Future<void> seed(Poem p) async => db
         .into(db.poems)

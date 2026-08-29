@@ -9,6 +9,7 @@ import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/mappers/poem_mapper.dart';
 import 'package:poetry_mate/data/preferences/reading_prefs.dart';
 import 'package:poetry_mate/data/providers.dart';
+import 'package:poetry_mate/data/repositories/poem_repository.dart';
 import 'package:poetry_mate/main.dart';
 
 import '../data/fixtures.dart';
@@ -128,5 +129,35 @@ void main() {
     await tester.tap(find.text('分类'));
     await tester.pumpAndSettle();
     expect(find.text('该分类下暂无诗篇'), findsOneWidget);
+  });
+
+  testWidgets('分类页删除诗词后从本地库移除', (tester) async {
+    final poem = testPoem(id: 'delete-from-browse', title: '待删除');
+    await db
+        .into(db.poems)
+        .insert(PoemMapper.toCompanion(poem), mode: InsertMode.insertOrIgnore);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          readingPrefsProvider.overrideWithValue(InMemoryReadingPrefs()),
+        ],
+        child: const PoetryMateApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('分类'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(ValueKey('delete-poem-${poem.id}')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除诗词？'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('confirm-poem-deletion')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('待删除'), findsNothing);
+    expect(await DriftPoemRepository(db).byId(poem.id), isNull);
   });
 }

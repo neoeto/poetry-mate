@@ -20,6 +20,9 @@ abstract class PoemRepository {
   /// 按 id 获取单首;不存在返回 null
   Future<Poem?> byId(String id);
 
+  /// 从本地公共诗库删除一首诗，并移除对应的收藏关系。
+  Future<void> delete(String id);
+
   /// 随机一首(“今日占位”用);空库返回 null
   Future<Poem?> randomOne();
 
@@ -43,6 +46,15 @@ class DriftPoemRepository implements PoemRepository {
   DriftPoemRepository(this._db);
 
   final AppDatabase _db;
+
+  @override
+  Future<void> delete(String id) {
+    return _db.transaction(() async {
+      await (_db.delete(_db.favorites)..where((t) => t.poemId.equals(id)))
+          .go();
+      await (_db.delete(_db.poems)..where((t) => t.id.equals(id))).go();
+    });
+  }
 
   @override
   Future<Poem?> byId(String id) async {

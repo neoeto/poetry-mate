@@ -115,6 +115,9 @@ class _FakePoemRepository implements PoemRepository {
   final List<String> queries = [];
 
   @override
+  Future<void> delete(String id) async {}
+
+  @override
   Future<Poem?> byId(String id) async =>
       poems.where((poem) => poem.id == id).firstOrNull;
 

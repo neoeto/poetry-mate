@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:drift/native.dart';
+import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/providers.dart';
+import 'package:poetry_mate/data/repositories/extended_poem_repository.dart';
 import 'package:poetry_mate/domain/entities/extended_poem.dart';
 import 'package:poetry_mate/features/extended/extended_library_page.dart';
 
@@ -49,5 +52,29 @@ void main() {
 
     expect(find.text('扩展诗词库还空着'), findsOneWidget);
     expect(find.text('开始 AI 寻诗'), findsOneWidget);
+  });
+
+  testWidgets('扩展诗词库删除作品后显示空态', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await DriftExtendedPoemRepository(db).save(poem);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [appDatabaseProvider.overrideWithValue(db)],
+        child: const MaterialApp(home: ExtendedLibraryPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('delete-extended-poem-ext-demo')));
+    await tester.pumpAndSettle();
+    expect(find.text('删除诗词？'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('confirm-poem-deletion')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('扩展诗词库还空着'), findsOneWidget);
+    expect(await DriftExtendedPoemRepository(db).byId(poem.id), isNull);
   });
 }

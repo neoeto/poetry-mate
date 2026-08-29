@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/providers.dart';
 import '../../domain/entities/poem.dart';
+import '../poem_deletion_dialog.dart';
 import 'browse_filters.dart';
 import 'poem_search_delegate.dart';
 
@@ -73,6 +74,7 @@ class BrowsePage extends ConsumerWidget {
                   itemBuilder: (_, index) {
                     final poem = poems[index];
                     return ListTile(
+                      key: ValueKey('poem-${poem.id}'),
                       title: Text(
                         poem.displayTitle.isEmpty
                             ? poem.paragraphs.first
@@ -81,12 +83,27 @@ class BrowsePage extends ConsumerWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text('${poem.author} · ${poem.dynasty}'),
-                      trailing: poem.popularity != null
-                          ? Text(
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (poem.popularity != null)
+                            Text(
                               poem.popularity!.toStringAsFixed(1),
                               style: Theme.of(context).textTheme.labelSmall,
-                            )
-                          : null,
+                            ),
+                          IconButton(
+                            key: ValueKey('delete-poem-${poem.id}'),
+                            tooltip: '删除诗词',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _deletePoem(
+                              context,
+                              ref,
+                              poem,
+                              selected,
+                            ),
+                          ),
+                        ],
+                      ),
                       onTap: () => context.push('/poem/${poem.id}'),
                     );
                   },
@@ -97,5 +114,34 @@ class BrowsePage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _deletePoem(
+    BuildContext context,
+    WidgetRef ref,
+    Poem poem,
+    String filterKey,
+  ) async {
+    final confirmed = await confirmPoemDeletion(
+      context,
+      title: poem.displayTitle,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    try {
+      await ref.read(poemRepositoryProvider).delete(poem.id);
+      ref.invalidate(filteredPoemsProvider(filterKey));
+      ref.invalidate(poemByIdProvider(poem.id));
+      ref.invalidate(favoriteItemsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已从本地诗库删除')));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('删除失败：$error')));
+    }
   }
 }

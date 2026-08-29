@@ -178,6 +178,9 @@ class _FakePoemRepository implements PoemRepository {
   final Poem poem;
 
   @override
+  Future<void> delete(String id) async {}
+
+  @override
   Future<Poem?> byId(String id) async => id == poem.id ? poem : null;
 
   @override
