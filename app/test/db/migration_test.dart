@@ -1,4 +1,4 @@
-// 迁移测试(任务 2.1): v1 库文件 → 打开后升级到 v2,旧数据保留+新表就位。
+// 迁移测试: v1 库文件 → 打开后升级到 v3,旧数据保留+新表就位。
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -55,7 +55,7 @@ void main() {
     db.close();
   }
 
-  test('v1 → v2: 新表建立且旧诗行保留', () async {
+  test('v1 → v3: 新表建立且旧诗行保留', () async {
     createRawV1();
 
     final db = AppDatabase(NativeDatabase(dbFile));
@@ -64,24 +64,26 @@ void main() {
     // 触发打开与迁移
     await db.customSelect('SELECT 1').get();
 
-    expect(db.schemaVersion, 2);
+    expect(db.schemaVersion, 3);
 
     // 旧诗行保留
     final oldRows = await db.select(db.poems).get();
     expect(oldRows, hasLength(1));
     expect(oldRows.first.id, 'legacy001');
 
-    // v2 新表可查询
+    // 既有注本/收藏表与 v3 扩展作品表均可查询
     expect(await db.select(db.notebookEntries).get(), isEmpty);
     expect(await db.select(db.favorites).get(), isEmpty);
+    expect(await db.select(db.extendedPoems).get(), isEmpty);
   });
 
-  test('全新安装直接建出 v2 全部表', () async {
+  test('全新安装直接建出 v3 全部表', () async {
     final db = AppDatabase(NativeDatabase(dbFile));
     addTearDown(db.close);
 
     await db.select(db.notebookEntries).get();
     await db.select(db.favorites).get();
-    expect(db.schemaVersion, 2);
+    await db.select(db.extendedPoems).get();
+    expect(db.schemaVersion, 3);
   });
 }

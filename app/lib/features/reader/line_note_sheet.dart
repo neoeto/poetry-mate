@@ -23,6 +23,7 @@ class LineNoteSheet extends ConsumerStatefulWidget {
     required this.poem,
     required this.lineIndex,
     required this.line,
+    this.annotationContext,
     this.onNoteReady,
     this.onOpenSettings,
   });
@@ -30,6 +31,7 @@ class LineNoteSheet extends ConsumerStatefulWidget {
   final Poem poem;
   final int lineIndex;
   final String line;
+  final AnnotationContext? annotationContext;
   final ValueChanged<LineNoteContent>? onNoteReady;
   final VoidCallback? onOpenSettings;
 
@@ -80,6 +82,8 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
           widget.poem,
           widget.lineIndex,
           forceRegenerate: forceRegenerate,
+          context:
+              widget.annotationContext ?? const AnnotationContext.persistent(),
         );
     _subscription = stream.listen(
       (event) {
@@ -142,6 +146,9 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
   void _retry() => _startStream();
 
   Future<NotebookEntry?> _entry() {
+    if (widget.annotationContext?.isTransient == true) {
+      return Future.value(null);
+    }
     return ref
         .read(notebookRepositoryProvider)
         .byTarget(
@@ -228,8 +235,14 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
                         ? _LineNoteError(onRetry: _retry)
                         : _LineNoteResult(
                             note: _note!,
-                            onEdit: _edit,
-                            onRegenerate: _regenerate,
+                            onEdit:
+                                widget.annotationContext?.isTransient == true
+                                ? null
+                                : _edit,
+                            onRegenerate:
+                                widget.annotationContext?.isTransient == true
+                                ? null
+                                : _regenerate,
                           ),
                   _LineNotePhase.error => _LineNoteError(
                     error: _error,
@@ -317,15 +330,11 @@ class _LineNoteLoading extends StatelessWidget {
 }
 
 class _LineNoteResult extends StatelessWidget {
-  const _LineNoteResult({
-    required this.note,
-    required this.onEdit,
-    required this.onRegenerate,
-  });
+  const _LineNoteResult({required this.note, this.onEdit, this.onRegenerate});
 
   final LineNoteContent note;
-  final VoidCallback onEdit;
-  final VoidCallback onRegenerate;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRegenerate;
 
   @override
   Widget build(BuildContext context) {
@@ -353,22 +362,26 @@ class _LineNoteResult extends StatelessWidget {
                 ),
               ),
           ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('编辑注本'),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: onRegenerate,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重新生成'),
-              ),
-            ],
-          ),
+          if (onEdit != null || onRegenerate != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (onEdit != null)
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('编辑注本'),
+                  ),
+                if (onEdit != null && onRegenerate != null) const Spacer(),
+                if (onRegenerate != null)
+                  TextButton.icon(
+                    onPressed: onRegenerate,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('重新生成'),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -492,6 +505,7 @@ Future<void> showLineNoteSheet(
   required Poem poem,
   required int lineIndex,
   required String line,
+  AnnotationContext? annotationContext,
   ValueChanged<LineNoteContent>? onNoteReady,
   VoidCallback? onOpenSettings,
 }) {
@@ -503,6 +517,7 @@ Future<void> showLineNoteSheet(
       poem: poem,
       lineIndex: lineIndex,
       line: line,
+      annotationContext: annotationContext,
       onNoteReady: onNoteReady,
       onOpenSettings: onOpenSettings,
     ),

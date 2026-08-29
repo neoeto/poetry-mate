@@ -38,10 +38,7 @@ class MinePage extends ConsumerWidget {
           const Divider(height: 28),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-            child: Text(
-              '阅读偏好',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+            child: Text('阅读偏好', style: Theme.of(context).textTheme.titleSmall),
           ),
           ListTile(
             title: const Text('正文字号'),
@@ -58,9 +55,8 @@ class MinePage extends ConsumerWidget {
                 kMaxContentFontSize,
               ),
               label: '${readingSettings.fontSize.round()}sp',
-              onChanged: (value) => ref
-                  .read(readingSettingsProvider.notifier)
-                  .setFontSize(value),
+              onChanged: (value) =>
+                  ref.read(readingSettingsProvider.notifier).setFontSize(value),
             ),
           ),
           Padding(
@@ -79,6 +75,18 @@ class MinePage extends ConsumerWidget {
             '你的批注与足迹',
             () => context.push('/settings/notebook'),
           ),
+          _navigationTile(
+            Icons.auto_awesome_outlined,
+            'AI 寻诗',
+            '从更广的中文文学中找一首合适的作品',
+            () => context.push('/ai-find'),
+          ),
+          _navigationTile(
+            Icons.library_books_outlined,
+            '扩展诗词库',
+            '查看你保存的 AI 补充作品',
+            () => context.push('/extended-library'),
+          ),
           const Divider(height: 28),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -94,10 +102,7 @@ class MinePage extends ConsumerWidget {
     );
   }
 
-  Widget _personaTile(
-    BuildContext context,
-    WidgetRef ref,
-  ) {
+  Widget _personaTile(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(personaSelectionProvider);
     final selectedPersona = personaById(selected.value ?? defaultPersonaId);
     return ListTile(
@@ -105,7 +110,8 @@ class MinePage extends ConsumerWidget {
       title: const Text('AI 人格'),
       subtitle: selected.when(
         loading: () => const Text('读取中…'),
-        error: (_, _) => Text('${selectedPersona.name} · ${selectedPersona.description}'),
+        error: (_, _) =>
+            Text('${selectedPersona.name} · ${selectedPersona.description}'),
         data: (id) {
           final persona = personaById(id);
           return Text('${persona.name} · ${persona.description}');

@@ -31,8 +31,8 @@ void main() {
     sourceCollection: 'seed',
   );
 
-  test('schemaVersion 升至 2(v1 基线 + 注本/收藏表)', () {
-    expect(db.schemaVersion, 2);
+  test('schemaVersion 升至 3(v1 基线 + 注本/收藏/扩展作品表)', () {
+    expect(db.schemaVersion, 3);
   });
 
   test('插入并回读: 字段完整、null 显式、JSON 数组解码正确', () async {
@@ -61,13 +61,13 @@ void main() {
   });
 
   test('upsert 模式可用于种子重灌(冲突时更新)', () async {
-    await db.into(db.poems).insertOnConflictUpdate(
-          PoemMapper.toCompanion(fixture),
-        );
+    await db
+        .into(db.poems)
+        .insertOnConflictUpdate(PoemMapper.toCompanion(fixture));
     final updated = fixture.popularity == null ? fixture : fixture;
-    await db.into(db.poems).insertOnConflictUpdate(
-          PoemMapper.toCompanion(updated),
-        );
+    await db
+        .into(db.poems)
+        .insertOnConflictUpdate(PoemMapper.toCompanion(updated));
     expect(await db.select(db.poems).get(), hasLength(1));
   });
 

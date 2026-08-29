@@ -21,11 +21,13 @@ class EssayTab extends ConsumerStatefulWidget {
   const EssayTab({
     super.key,
     required this.poem,
+    this.annotationContext,
     this.onContentReady,
     this.onOpenSettings,
   });
 
   final Poem poem;
+  final AnnotationContext? annotationContext;
   final ValueChanged<EssayContent>? onContentReady;
   final VoidCallback? onOpenSettings;
 
@@ -76,7 +78,12 @@ class _EssayTabState extends ConsumerState<EssayTab>
 
     final stream = ref
         .read(annotationServiceProvider)
-        .streamEssay(widget.poem, forceRegenerate: forceRegenerate);
+        .streamEssay(
+          widget.poem,
+          forceRegenerate: forceRegenerate,
+          context:
+              widget.annotationContext ?? const AnnotationContext.persistent(),
+        );
     _subscription = stream.listen(
       (event) {
         if (!mounted || generation != _generation) return;
@@ -139,6 +146,9 @@ class _EssayTabState extends ConsumerState<EssayTab>
   void _retry() => _startStream();
 
   Future<NotebookEntry?> _entry() {
+    if (widget.annotationContext?.isTransient == true) {
+      return Future.value(null);
+    }
     return ref
         .read(notebookRepositoryProvider)
         .byTarget(poemId: widget.poem.id, kind: NotebookKind.essay);
@@ -187,8 +197,12 @@ class _EssayTabState extends ConsumerState<EssayTab>
             ? _EssayError(onRetry: _retry)
             : EssayContentView(
                 content: _content!,
-                onEdit: _edit,
-                onRegenerate: _regenerate,
+                onEdit: widget.annotationContext?.isTransient == true
+                    ? null
+                    : _edit,
+                onRegenerate: widget.annotationContext?.isTransient == true
+                    ? null
+                    : _regenerate,
               ),
       _EssayPhase.error => _EssayError(
         error: _error,

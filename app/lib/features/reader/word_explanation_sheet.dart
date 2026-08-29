@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/llm/annotation_service.dart';
 import '../../core/llm/llm_exception.dart';
 import '../../core/ui/app_theme.dart';
 import '../../data/providers.dart';
@@ -129,12 +130,14 @@ class SelectedWordExplanationSheet extends ConsumerStatefulWidget {
     super.key,
     required this.poem,
     required this.position,
+    this.annotationContext,
     this.onChanged,
     this.onOpenSettings,
   });
 
   final Poem poem;
   final SelectedWordPosition position;
+  final AnnotationContext? annotationContext;
   final VoidCallback? onChanged;
   final VoidCallback? onOpenSettings;
 
@@ -160,6 +163,8 @@ class _SelectedWordExplanationSheetState
           widget.poem,
           widget.position,
           forceRegenerate: forceRegenerate,
+          context:
+              widget.annotationContext ?? const AnnotationContext.persistent(),
         );
     widget.onChanged?.call();
     return note;
@@ -170,6 +175,9 @@ class _SelectedWordExplanationSheetState
   }
 
   Future<NotebookEntry?> _entry() {
+    if (widget.annotationContext?.isTransient == true) {
+      return Future.value(null);
+    }
     return ref
         .read(notebookRepositoryProvider)
         .byTarget(
@@ -248,22 +256,25 @@ class _SelectedWordExplanationSheetState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _WordExplanationContent(note: note),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              TextButton.icon(
-                                onPressed: _edit,
-                                icon: const Icon(Icons.edit_outlined),
-                                label: const Text('编辑注本'),
-                              ),
-                              const Spacer(),
-                              TextButton.icon(
-                                onPressed: _regenerate,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('重新生成'),
-                              ),
-                            ],
-                          ),
+                          if (widget.annotationContext?.isTransient !=
+                              true) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                TextButton.icon(
+                                  onPressed: _edit,
+                                  icon: const Icon(Icons.edit_outlined),
+                                  label: const Text('编辑注本'),
+                                ),
+                                const Spacer(),
+                                TextButton.icon(
+                                  onPressed: _regenerate,
+                                  icon: const Icon(Icons.refresh),
+                                  label: const Text('重新生成'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     );
@@ -384,6 +395,7 @@ Future<void> showSelectedWordExplanationSheet(
   BuildContext context, {
   required Poem poem,
   required SelectedWordPosition position,
+  AnnotationContext? annotationContext,
   VoidCallback? onChanged,
   VoidCallback? onOpenSettings,
 }) {
@@ -394,6 +406,7 @@ Future<void> showSelectedWordExplanationSheet(
     builder: (_) => SelectedWordExplanationSheet(
       poem: poem,
       position: position,
+      annotationContext: annotationContext,
       onChanged: onChanged,
       onOpenSettings: onOpenSettings,
     ),

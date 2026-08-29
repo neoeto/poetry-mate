@@ -1529,6 +1529,833 @@ class FavoritesCompanion extends UpdateCompanion<FavoriteRow> {
   }
 }
 
+class $ExtendedPoemsTable extends ExtendedPoems
+    with TableInfo<$ExtendedPoemsTable, ExtendedPoemRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExtendedPoemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fingerprintMeta = const VerificationMeta(
+    'fingerprint',
+  );
+  @override
+  late final GeneratedColumn<String> fingerprint = GeneratedColumn<String>(
+    'fingerprint',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _authorMeta = const VerificationMeta('author');
+  @override
+  late final GeneratedColumn<String> author = GeneratedColumn<String>(
+    'author',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _periodMeta = const VerificationMeta('period');
+  @override
+  late final GeneratedColumn<String> period = GeneratedColumn<String>(
+    'period',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _genreMeta = const VerificationMeta('genre');
+  @override
+  late final GeneratedColumn<String> genre = GeneratedColumn<String>(
+    'genre',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _paragraphsJsonMeta = const VerificationMeta(
+    'paragraphsJson',
+  );
+  @override
+  late final GeneratedColumn<String> paragraphsJson = GeneratedColumn<String>(
+    'paragraphs_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _prefaceMeta = const VerificationMeta(
+    'preface',
+  );
+  @override
+  late final GeneratedColumn<String> preface = GeneratedColumn<String>(
+    'preface',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _rhythmicMeta = const VerificationMeta(
+    'rhythmic',
+  );
+  @override
+  late final GeneratedColumn<String> rhythmic = GeneratedColumn<String>(
+    'rhythmic',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+    'source',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceConfidenceMeta = const VerificationMeta(
+    'sourceConfidence',
+  );
+  @override
+  late final GeneratedColumn<String> sourceConfidence = GeneratedColumn<String>(
+    'source_confidence',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _uncertainFieldsJsonMeta =
+      const VerificationMeta('uncertainFieldsJson');
+  @override
+  late final GeneratedColumn<String> uncertainFieldsJson =
+      GeneratedColumn<String>(
+        'uncertain_fields_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      );
+  static const VerificationMeta _recommendationMeta = const VerificationMeta(
+    'recommendation',
+  );
+  @override
+  late final GeneratedColumn<String> recommendation = GeneratedColumn<String>(
+    'recommendation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    fingerprint,
+    title,
+    author,
+    period,
+    genre,
+    paragraphsJson,
+    preface,
+    rhythmic,
+    source,
+    sourceConfidence,
+    uncertainFieldsJson,
+    recommendation,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'extended_poems';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExtendedPoemRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('fingerprint')) {
+      context.handle(
+        _fingerprintMeta,
+        fingerprint.isAcceptableOrUnknown(
+          data['fingerprint']!,
+          _fingerprintMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fingerprintMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('author')) {
+      context.handle(
+        _authorMeta,
+        author.isAcceptableOrUnknown(data['author']!, _authorMeta),
+      );
+    }
+    if (data.containsKey('period')) {
+      context.handle(
+        _periodMeta,
+        period.isAcceptableOrUnknown(data['period']!, _periodMeta),
+      );
+    }
+    if (data.containsKey('genre')) {
+      context.handle(
+        _genreMeta,
+        genre.isAcceptableOrUnknown(data['genre']!, _genreMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_genreMeta);
+    }
+    if (data.containsKey('paragraphs_json')) {
+      context.handle(
+        _paragraphsJsonMeta,
+        paragraphsJson.isAcceptableOrUnknown(
+          data['paragraphs_json']!,
+          _paragraphsJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_paragraphsJsonMeta);
+    }
+    if (data.containsKey('preface')) {
+      context.handle(
+        _prefaceMeta,
+        preface.isAcceptableOrUnknown(data['preface']!, _prefaceMeta),
+      );
+    }
+    if (data.containsKey('rhythmic')) {
+      context.handle(
+        _rhythmicMeta,
+        rhythmic.isAcceptableOrUnknown(data['rhythmic']!, _rhythmicMeta),
+      );
+    }
+    if (data.containsKey('source')) {
+      context.handle(
+        _sourceMeta,
+        source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
+      );
+    }
+    if (data.containsKey('source_confidence')) {
+      context.handle(
+        _sourceConfidenceMeta,
+        sourceConfidence.isAcceptableOrUnknown(
+          data['source_confidence']!,
+          _sourceConfidenceMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceConfidenceMeta);
+    }
+    if (data.containsKey('uncertain_fields_json')) {
+      context.handle(
+        _uncertainFieldsJsonMeta,
+        uncertainFieldsJson.isAcceptableOrUnknown(
+          data['uncertain_fields_json']!,
+          _uncertainFieldsJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_uncertainFieldsJsonMeta);
+    }
+    if (data.containsKey('recommendation')) {
+      context.handle(
+        _recommendationMeta,
+        recommendation.isAcceptableOrUnknown(
+          data['recommendation']!,
+          _recommendationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExtendedPoemRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExtendedPoemRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      fingerprint: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fingerprint'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      author: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author'],
+      ),
+      period: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period'],
+      ),
+      genre: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}genre'],
+      )!,
+      paragraphsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}paragraphs_json'],
+      )!,
+      preface: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}preface'],
+      ),
+      rhythmic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}rhythmic'],
+      ),
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source'],
+      ),
+      sourceConfidence: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_confidence'],
+      )!,
+      uncertainFieldsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}uncertain_fields_json'],
+      )!,
+      recommendation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recommendation'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ExtendedPoemsTable createAlias(String alias) {
+    return $ExtendedPoemsTable(attachedDatabase, alias);
+  }
+}
+
+class ExtendedPoemRow extends DataClass implements Insertable<ExtendedPoemRow> {
+  /// ext_<fingerprint>，与公共诗库 ID 使用独立命名空间。
+  final String id;
+
+  /// 正文/序文规范化后的去重指纹。
+  final String fingerprint;
+  final String title;
+  final String? author;
+  final String? period;
+  final String genre;
+  final String paragraphsJson;
+  final String? preface;
+  final String? rhythmic;
+  final String? source;
+  final String sourceConfidence;
+  final String uncertainFieldsJson;
+  final String recommendation;
+  final int createdAt;
+  const ExtendedPoemRow({
+    required this.id,
+    required this.fingerprint,
+    required this.title,
+    this.author,
+    this.period,
+    required this.genre,
+    required this.paragraphsJson,
+    this.preface,
+    this.rhythmic,
+    this.source,
+    required this.sourceConfidence,
+    required this.uncertainFieldsJson,
+    required this.recommendation,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['fingerprint'] = Variable<String>(fingerprint);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || author != null) {
+      map['author'] = Variable<String>(author);
+    }
+    if (!nullToAbsent || period != null) {
+      map['period'] = Variable<String>(period);
+    }
+    map['genre'] = Variable<String>(genre);
+    map['paragraphs_json'] = Variable<String>(paragraphsJson);
+    if (!nullToAbsent || preface != null) {
+      map['preface'] = Variable<String>(preface);
+    }
+    if (!nullToAbsent || rhythmic != null) {
+      map['rhythmic'] = Variable<String>(rhythmic);
+    }
+    if (!nullToAbsent || source != null) {
+      map['source'] = Variable<String>(source);
+    }
+    map['source_confidence'] = Variable<String>(sourceConfidence);
+    map['uncertain_fields_json'] = Variable<String>(uncertainFieldsJson);
+    map['recommendation'] = Variable<String>(recommendation);
+    map['created_at'] = Variable<int>(createdAt);
+    return map;
+  }
+
+  ExtendedPoemsCompanion toCompanion(bool nullToAbsent) {
+    return ExtendedPoemsCompanion(
+      id: Value(id),
+      fingerprint: Value(fingerprint),
+      title: Value(title),
+      author: author == null && nullToAbsent
+          ? const Value.absent()
+          : Value(author),
+      period: period == null && nullToAbsent
+          ? const Value.absent()
+          : Value(period),
+      genre: Value(genre),
+      paragraphsJson: Value(paragraphsJson),
+      preface: preface == null && nullToAbsent
+          ? const Value.absent()
+          : Value(preface),
+      rhythmic: rhythmic == null && nullToAbsent
+          ? const Value.absent()
+          : Value(rhythmic),
+      source: source == null && nullToAbsent
+          ? const Value.absent()
+          : Value(source),
+      sourceConfidence: Value(sourceConfidence),
+      uncertainFieldsJson: Value(uncertainFieldsJson),
+      recommendation: Value(recommendation),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory ExtendedPoemRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExtendedPoemRow(
+      id: serializer.fromJson<String>(json['id']),
+      fingerprint: serializer.fromJson<String>(json['fingerprint']),
+      title: serializer.fromJson<String>(json['title']),
+      author: serializer.fromJson<String?>(json['author']),
+      period: serializer.fromJson<String?>(json['period']),
+      genre: serializer.fromJson<String>(json['genre']),
+      paragraphsJson: serializer.fromJson<String>(json['paragraphsJson']),
+      preface: serializer.fromJson<String?>(json['preface']),
+      rhythmic: serializer.fromJson<String?>(json['rhythmic']),
+      source: serializer.fromJson<String?>(json['source']),
+      sourceConfidence: serializer.fromJson<String>(json['sourceConfidence']),
+      uncertainFieldsJson: serializer.fromJson<String>(
+        json['uncertainFieldsJson'],
+      ),
+      recommendation: serializer.fromJson<String>(json['recommendation']),
+      createdAt: serializer.fromJson<int>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'fingerprint': serializer.toJson<String>(fingerprint),
+      'title': serializer.toJson<String>(title),
+      'author': serializer.toJson<String?>(author),
+      'period': serializer.toJson<String?>(period),
+      'genre': serializer.toJson<String>(genre),
+      'paragraphsJson': serializer.toJson<String>(paragraphsJson),
+      'preface': serializer.toJson<String?>(preface),
+      'rhythmic': serializer.toJson<String?>(rhythmic),
+      'source': serializer.toJson<String?>(source),
+      'sourceConfidence': serializer.toJson<String>(sourceConfidence),
+      'uncertainFieldsJson': serializer.toJson<String>(uncertainFieldsJson),
+      'recommendation': serializer.toJson<String>(recommendation),
+      'createdAt': serializer.toJson<int>(createdAt),
+    };
+  }
+
+  ExtendedPoemRow copyWith({
+    String? id,
+    String? fingerprint,
+    String? title,
+    Value<String?> author = const Value.absent(),
+    Value<String?> period = const Value.absent(),
+    String? genre,
+    String? paragraphsJson,
+    Value<String?> preface = const Value.absent(),
+    Value<String?> rhythmic = const Value.absent(),
+    Value<String?> source = const Value.absent(),
+    String? sourceConfidence,
+    String? uncertainFieldsJson,
+    String? recommendation,
+    int? createdAt,
+  }) => ExtendedPoemRow(
+    id: id ?? this.id,
+    fingerprint: fingerprint ?? this.fingerprint,
+    title: title ?? this.title,
+    author: author.present ? author.value : this.author,
+    period: period.present ? period.value : this.period,
+    genre: genre ?? this.genre,
+    paragraphsJson: paragraphsJson ?? this.paragraphsJson,
+    preface: preface.present ? preface.value : this.preface,
+    rhythmic: rhythmic.present ? rhythmic.value : this.rhythmic,
+    source: source.present ? source.value : this.source,
+    sourceConfidence: sourceConfidence ?? this.sourceConfidence,
+    uncertainFieldsJson: uncertainFieldsJson ?? this.uncertainFieldsJson,
+    recommendation: recommendation ?? this.recommendation,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  ExtendedPoemRow copyWithCompanion(ExtendedPoemsCompanion data) {
+    return ExtendedPoemRow(
+      id: data.id.present ? data.id.value : this.id,
+      fingerprint: data.fingerprint.present
+          ? data.fingerprint.value
+          : this.fingerprint,
+      title: data.title.present ? data.title.value : this.title,
+      author: data.author.present ? data.author.value : this.author,
+      period: data.period.present ? data.period.value : this.period,
+      genre: data.genre.present ? data.genre.value : this.genre,
+      paragraphsJson: data.paragraphsJson.present
+          ? data.paragraphsJson.value
+          : this.paragraphsJson,
+      preface: data.preface.present ? data.preface.value : this.preface,
+      rhythmic: data.rhythmic.present ? data.rhythmic.value : this.rhythmic,
+      source: data.source.present ? data.source.value : this.source,
+      sourceConfidence: data.sourceConfidence.present
+          ? data.sourceConfidence.value
+          : this.sourceConfidence,
+      uncertainFieldsJson: data.uncertainFieldsJson.present
+          ? data.uncertainFieldsJson.value
+          : this.uncertainFieldsJson,
+      recommendation: data.recommendation.present
+          ? data.recommendation.value
+          : this.recommendation,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtendedPoemRow(')
+          ..write('id: $id, ')
+          ..write('fingerprint: $fingerprint, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('period: $period, ')
+          ..write('genre: $genre, ')
+          ..write('paragraphsJson: $paragraphsJson, ')
+          ..write('preface: $preface, ')
+          ..write('rhythmic: $rhythmic, ')
+          ..write('source: $source, ')
+          ..write('sourceConfidence: $sourceConfidence, ')
+          ..write('uncertainFieldsJson: $uncertainFieldsJson, ')
+          ..write('recommendation: $recommendation, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    fingerprint,
+    title,
+    author,
+    period,
+    genre,
+    paragraphsJson,
+    preface,
+    rhythmic,
+    source,
+    sourceConfidence,
+    uncertainFieldsJson,
+    recommendation,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExtendedPoemRow &&
+          other.id == this.id &&
+          other.fingerprint == this.fingerprint &&
+          other.title == this.title &&
+          other.author == this.author &&
+          other.period == this.period &&
+          other.genre == this.genre &&
+          other.paragraphsJson == this.paragraphsJson &&
+          other.preface == this.preface &&
+          other.rhythmic == this.rhythmic &&
+          other.source == this.source &&
+          other.sourceConfidence == this.sourceConfidence &&
+          other.uncertainFieldsJson == this.uncertainFieldsJson &&
+          other.recommendation == this.recommendation &&
+          other.createdAt == this.createdAt);
+}
+
+class ExtendedPoemsCompanion extends UpdateCompanion<ExtendedPoemRow> {
+  final Value<String> id;
+  final Value<String> fingerprint;
+  final Value<String> title;
+  final Value<String?> author;
+  final Value<String?> period;
+  final Value<String> genre;
+  final Value<String> paragraphsJson;
+  final Value<String?> preface;
+  final Value<String?> rhythmic;
+  final Value<String?> source;
+  final Value<String> sourceConfidence;
+  final Value<String> uncertainFieldsJson;
+  final Value<String> recommendation;
+  final Value<int> createdAt;
+  final Value<int> rowid;
+  const ExtendedPoemsCompanion({
+    this.id = const Value.absent(),
+    this.fingerprint = const Value.absent(),
+    this.title = const Value.absent(),
+    this.author = const Value.absent(),
+    this.period = const Value.absent(),
+    this.genre = const Value.absent(),
+    this.paragraphsJson = const Value.absent(),
+    this.preface = const Value.absent(),
+    this.rhythmic = const Value.absent(),
+    this.source = const Value.absent(),
+    this.sourceConfidence = const Value.absent(),
+    this.uncertainFieldsJson = const Value.absent(),
+    this.recommendation = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ExtendedPoemsCompanion.insert({
+    required String id,
+    required String fingerprint,
+    required String title,
+    this.author = const Value.absent(),
+    this.period = const Value.absent(),
+    required String genre,
+    required String paragraphsJson,
+    this.preface = const Value.absent(),
+    this.rhythmic = const Value.absent(),
+    this.source = const Value.absent(),
+    required String sourceConfidence,
+    required String uncertainFieldsJson,
+    this.recommendation = const Value.absent(),
+    required int createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       fingerprint = Value(fingerprint),
+       title = Value(title),
+       genre = Value(genre),
+       paragraphsJson = Value(paragraphsJson),
+       sourceConfidence = Value(sourceConfidence),
+       uncertainFieldsJson = Value(uncertainFieldsJson),
+       createdAt = Value(createdAt);
+  static Insertable<ExtendedPoemRow> custom({
+    Expression<String>? id,
+    Expression<String>? fingerprint,
+    Expression<String>? title,
+    Expression<String>? author,
+    Expression<String>? period,
+    Expression<String>? genre,
+    Expression<String>? paragraphsJson,
+    Expression<String>? preface,
+    Expression<String>? rhythmic,
+    Expression<String>? source,
+    Expression<String>? sourceConfidence,
+    Expression<String>? uncertainFieldsJson,
+    Expression<String>? recommendation,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (fingerprint != null) 'fingerprint': fingerprint,
+      if (title != null) 'title': title,
+      if (author != null) 'author': author,
+      if (period != null) 'period': period,
+      if (genre != null) 'genre': genre,
+      if (paragraphsJson != null) 'paragraphs_json': paragraphsJson,
+      if (preface != null) 'preface': preface,
+      if (rhythmic != null) 'rhythmic': rhythmic,
+      if (source != null) 'source': source,
+      if (sourceConfidence != null) 'source_confidence': sourceConfidence,
+      if (uncertainFieldsJson != null)
+        'uncertain_fields_json': uncertainFieldsJson,
+      if (recommendation != null) 'recommendation': recommendation,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ExtendedPoemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? fingerprint,
+    Value<String>? title,
+    Value<String?>? author,
+    Value<String?>? period,
+    Value<String>? genre,
+    Value<String>? paragraphsJson,
+    Value<String?>? preface,
+    Value<String?>? rhythmic,
+    Value<String?>? source,
+    Value<String>? sourceConfidence,
+    Value<String>? uncertainFieldsJson,
+    Value<String>? recommendation,
+    Value<int>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return ExtendedPoemsCompanion(
+      id: id ?? this.id,
+      fingerprint: fingerprint ?? this.fingerprint,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      period: period ?? this.period,
+      genre: genre ?? this.genre,
+      paragraphsJson: paragraphsJson ?? this.paragraphsJson,
+      preface: preface ?? this.preface,
+      rhythmic: rhythmic ?? this.rhythmic,
+      source: source ?? this.source,
+      sourceConfidence: sourceConfidence ?? this.sourceConfidence,
+      uncertainFieldsJson: uncertainFieldsJson ?? this.uncertainFieldsJson,
+      recommendation: recommendation ?? this.recommendation,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (fingerprint.present) {
+      map['fingerprint'] = Variable<String>(fingerprint.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (author.present) {
+      map['author'] = Variable<String>(author.value);
+    }
+    if (period.present) {
+      map['period'] = Variable<String>(period.value);
+    }
+    if (genre.present) {
+      map['genre'] = Variable<String>(genre.value);
+    }
+    if (paragraphsJson.present) {
+      map['paragraphs_json'] = Variable<String>(paragraphsJson.value);
+    }
+    if (preface.present) {
+      map['preface'] = Variable<String>(preface.value);
+    }
+    if (rhythmic.present) {
+      map['rhythmic'] = Variable<String>(rhythmic.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (sourceConfidence.present) {
+      map['source_confidence'] = Variable<String>(sourceConfidence.value);
+    }
+    if (uncertainFieldsJson.present) {
+      map['uncertain_fields_json'] = Variable<String>(
+        uncertainFieldsJson.value,
+      );
+    }
+    if (recommendation.present) {
+      map['recommendation'] = Variable<String>(recommendation.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtendedPoemsCompanion(')
+          ..write('id: $id, ')
+          ..write('fingerprint: $fingerprint, ')
+          ..write('title: $title, ')
+          ..write('author: $author, ')
+          ..write('period: $period, ')
+          ..write('genre: $genre, ')
+          ..write('paragraphsJson: $paragraphsJson, ')
+          ..write('preface: $preface, ')
+          ..write('rhythmic: $rhythmic, ')
+          ..write('source: $source, ')
+          ..write('sourceConfidence: $sourceConfidence, ')
+          ..write('uncertainFieldsJson: $uncertainFieldsJson, ')
+          ..write('recommendation: $recommendation, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1537,6 +2364,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $FavoritesTable favorites = $FavoritesTable(this);
+  late final $ExtendedPoemsTable extendedPoems = $ExtendedPoemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1545,6 +2373,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     poems,
     notebookEntries,
     favorites,
+    extendedPoems,
   ];
 }
 
@@ -2311,6 +3140,387 @@ typedef $$FavoritesTableProcessedTableManager =
       FavoriteRow,
       PrefetchHooks Function()
     >;
+typedef $$ExtendedPoemsTableCreateCompanionBuilder =
+    ExtendedPoemsCompanion Function({
+      required String id,
+      required String fingerprint,
+      required String title,
+      Value<String?> author,
+      Value<String?> period,
+      required String genre,
+      required String paragraphsJson,
+      Value<String?> preface,
+      Value<String?> rhythmic,
+      Value<String?> source,
+      required String sourceConfidence,
+      required String uncertainFieldsJson,
+      Value<String> recommendation,
+      required int createdAt,
+      Value<int> rowid,
+    });
+typedef $$ExtendedPoemsTableUpdateCompanionBuilder =
+    ExtendedPoemsCompanion Function({
+      Value<String> id,
+      Value<String> fingerprint,
+      Value<String> title,
+      Value<String?> author,
+      Value<String?> period,
+      Value<String> genre,
+      Value<String> paragraphsJson,
+      Value<String?> preface,
+      Value<String?> rhythmic,
+      Value<String?> source,
+      Value<String> sourceConfidence,
+      Value<String> uncertainFieldsJson,
+      Value<String> recommendation,
+      Value<int> createdAt,
+      Value<int> rowid,
+    });
+
+class $$ExtendedPoemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ExtendedPoemsTable> {
+  $$ExtendedPoemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fingerprint => $composableBuilder(
+    column: $table.fingerprint,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get period => $composableBuilder(
+    column: $table.period,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get genre => $composableBuilder(
+    column: $table.genre,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paragraphsJson => $composableBuilder(
+    column: $table.paragraphsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get preface => $composableBuilder(
+    column: $table.preface,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get rhythmic => $composableBuilder(
+    column: $table.rhythmic,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceConfidence => $composableBuilder(
+    column: $table.sourceConfidence,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get uncertainFieldsJson => $composableBuilder(
+    column: $table.uncertainFieldsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recommendation => $composableBuilder(
+    column: $table.recommendation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ExtendedPoemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExtendedPoemsTable> {
+  $$ExtendedPoemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fingerprint => $composableBuilder(
+    column: $table.fingerprint,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get author => $composableBuilder(
+    column: $table.author,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get period => $composableBuilder(
+    column: $table.period,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get genre => $composableBuilder(
+    column: $table.genre,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paragraphsJson => $composableBuilder(
+    column: $table.paragraphsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get preface => $composableBuilder(
+    column: $table.preface,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get rhythmic => $composableBuilder(
+    column: $table.rhythmic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get source => $composableBuilder(
+    column: $table.source,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceConfidence => $composableBuilder(
+    column: $table.sourceConfidence,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get uncertainFieldsJson => $composableBuilder(
+    column: $table.uncertainFieldsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recommendation => $composableBuilder(
+    column: $table.recommendation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExtendedPoemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExtendedPoemsTable> {
+  $$ExtendedPoemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get fingerprint => $composableBuilder(
+    column: $table.fingerprint,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get author =>
+      $composableBuilder(column: $table.author, builder: (column) => column);
+
+  GeneratedColumn<String> get period =>
+      $composableBuilder(column: $table.period, builder: (column) => column);
+
+  GeneratedColumn<String> get genre =>
+      $composableBuilder(column: $table.genre, builder: (column) => column);
+
+  GeneratedColumn<String> get paragraphsJson => $composableBuilder(
+    column: $table.paragraphsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get preface =>
+      $composableBuilder(column: $table.preface, builder: (column) => column);
+
+  GeneratedColumn<String> get rhythmic =>
+      $composableBuilder(column: $table.rhythmic, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceConfidence => $composableBuilder(
+    column: $table.sourceConfidence,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get uncertainFieldsJson => $composableBuilder(
+    column: $table.uncertainFieldsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recommendation => $composableBuilder(
+    column: $table.recommendation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ExtendedPoemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExtendedPoemsTable,
+          ExtendedPoemRow,
+          $$ExtendedPoemsTableFilterComposer,
+          $$ExtendedPoemsTableOrderingComposer,
+          $$ExtendedPoemsTableAnnotationComposer,
+          $$ExtendedPoemsTableCreateCompanionBuilder,
+          $$ExtendedPoemsTableUpdateCompanionBuilder,
+          (
+            ExtendedPoemRow,
+            BaseReferences<_$AppDatabase, $ExtendedPoemsTable, ExtendedPoemRow>,
+          ),
+          ExtendedPoemRow,
+          PrefetchHooks Function()
+        > {
+  $$ExtendedPoemsTableTableManager(_$AppDatabase db, $ExtendedPoemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExtendedPoemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExtendedPoemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExtendedPoemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> fingerprint = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> author = const Value.absent(),
+                Value<String?> period = const Value.absent(),
+                Value<String> genre = const Value.absent(),
+                Value<String> paragraphsJson = const Value.absent(),
+                Value<String?> preface = const Value.absent(),
+                Value<String?> rhythmic = const Value.absent(),
+                Value<String?> source = const Value.absent(),
+                Value<String> sourceConfidence = const Value.absent(),
+                Value<String> uncertainFieldsJson = const Value.absent(),
+                Value<String> recommendation = const Value.absent(),
+                Value<int> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExtendedPoemsCompanion(
+                id: id,
+                fingerprint: fingerprint,
+                title: title,
+                author: author,
+                period: period,
+                genre: genre,
+                paragraphsJson: paragraphsJson,
+                preface: preface,
+                rhythmic: rhythmic,
+                source: source,
+                sourceConfidence: sourceConfidence,
+                uncertainFieldsJson: uncertainFieldsJson,
+                recommendation: recommendation,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String fingerprint,
+                required String title,
+                Value<String?> author = const Value.absent(),
+                Value<String?> period = const Value.absent(),
+                required String genre,
+                required String paragraphsJson,
+                Value<String?> preface = const Value.absent(),
+                Value<String?> rhythmic = const Value.absent(),
+                Value<String?> source = const Value.absent(),
+                required String sourceConfidence,
+                required String uncertainFieldsJson,
+                Value<String> recommendation = const Value.absent(),
+                required int createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ExtendedPoemsCompanion.insert(
+                id: id,
+                fingerprint: fingerprint,
+                title: title,
+                author: author,
+                period: period,
+                genre: genre,
+                paragraphsJson: paragraphsJson,
+                preface: preface,
+                rhythmic: rhythmic,
+                source: source,
+                sourceConfidence: sourceConfidence,
+                uncertainFieldsJson: uncertainFieldsJson,
+                recommendation: recommendation,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExtendedPoemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExtendedPoemsTable,
+      ExtendedPoemRow,
+      $$ExtendedPoemsTableFilterComposer,
+      $$ExtendedPoemsTableOrderingComposer,
+      $$ExtendedPoemsTableAnnotationComposer,
+      $$ExtendedPoemsTableCreateCompanionBuilder,
+      $$ExtendedPoemsTableUpdateCompanionBuilder,
+      (
+        ExtendedPoemRow,
+        BaseReferences<_$AppDatabase, $ExtendedPoemsTable, ExtendedPoemRow>,
+      ),
+      ExtendedPoemRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2321,4 +3531,6 @@ class $AppDatabaseManager {
       $$NotebookEntriesTableTableManager(_db, _db.notebookEntries);
   $$FavoritesTableTableManager get favorites =>
       $$FavoritesTableTableManager(_db, _db.favorites);
+  $$ExtendedPoemsTableTableManager get extendedPoems =>
+      $$ExtendedPoemsTableTableManager(_db, _db.extendedPoems);
 }

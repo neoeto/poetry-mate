@@ -25,10 +25,7 @@ void main() {
 
   final poem = testPoem(paragraphs: ['床前明月光，']);
 
-  Future<void> pumpChat(
-    WidgetTester tester,
-    _FakeChatService service,
-  ) async {
+  Future<void> pumpChat(WidgetTester tester, _FakeChatService service) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [annotationServiceProvider.overrideWithValue(service)],
@@ -126,20 +123,18 @@ void main() {
 }
 
 class _FakeChatService extends AnnotationService {
-  _FakeChatService(
-    this.deltas, {
-    this.error,
-  }) : super(
-          notebookRepository: _NoopNotebookRepository(),
-          llmClient: LlmClient(
-            configStore: _NoopConfigStore(),
-            transport: _NoopTransport(),
-          ),
-          personaService: PersonaService(
-            assets: _NoopAssetBundle(),
-            prefs: InMemoryPrefsStore(),
-          ),
-        );
+  _FakeChatService(this.deltas, {this.error})
+    : super(
+        notebookRepository: _NoopNotebookRepository(),
+        llmClient: LlmClient(
+          configStore: _NoopConfigStore(),
+          transport: _NoopTransport(),
+        ),
+        personaService: PersonaService(
+          assets: _NoopAssetBundle(),
+          prefs: InMemoryPrefsStore(),
+        ),
+      );
 
   final List<ChatDelta> deltas;
   final Object? error;
@@ -153,6 +148,7 @@ class _FakeChatService extends AnnotationService {
     String question, {
     String? personaId,
     EssayContent? essay,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) async* {
     calls++;
     lastPoem = poem;

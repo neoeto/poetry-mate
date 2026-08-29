@@ -33,6 +33,33 @@ class SelectedWordValidationException extends LlmException {
     : super(LlmErrorKind.badResponse, message);
 }
 
+/// 解析结果的保存策略。
+enum AnnotationPersistence { persistent, transient }
+
+/// 一次临时阅读会话的内存缓存，不包含任何数据库访问。
+class TransientAnnotationSession {
+  final Map<String, LineNoteContent> lineNotes = {};
+  final Map<String, EssayContent> essays = {};
+  final Map<String, WordNote> wordNotes = {};
+  final Map<String, ChatTurnContent> chatTurns = {};
+}
+
+/// 传给阅读页和注解服务的生命周期上下文。
+class AnnotationContext {
+  const AnnotationContext.persistent()
+    : persistence = AnnotationPersistence.persistent,
+      session = null;
+
+  AnnotationContext.transient({TransientAnnotationSession? session})
+    : persistence = AnnotationPersistence.transient,
+      session = session ?? TransientAnnotationSession();
+
+  final AnnotationPersistence persistence;
+  final TransientAnnotationSession? session;
+
+  bool get isTransient => persistence == AnnotationPersistence.transient;
+}
+
 /// 结构化赏析的流式事件。
 sealed class AnnotationEvent<T> {
   const AnnotationEvent();
@@ -89,27 +116,33 @@ class AnnotationService {
     int lineIndex, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) async* {
     final target = lineIndex.toString();
-    final existing = await _notebook.byTarget(
-      poemId: poem.id,
-      kind: NotebookKind.lineNote,
-      target: target,
-    );
-    if (existing != null && !forceRegenerate) {
-      final cached =
-          LineNoteContent.tryParse(jsonEncode(existing.content)) ??
-          LineNoteContent.fromJson(existing.content);
-      yield AnnotationDone(cached);
-      return;
+    final cacheKey = _lineCacheKey(poem, target);
+    if (context.isTransient) {
+      final cached = context.session?.lineNotes[cacheKey];
+      if (cached != null && !forceRegenerate) {
+        yield AnnotationDone(cached);
+        return;
+      }
+    } else {
+      final existing = await _notebook.byTarget(
+        poemId: poem.id,
+        kind: NotebookKind.lineNote,
+        target: target,
+      );
+      if (existing != null && !forceRegenerate) {
+        final cached =
+            LineNoteContent.tryParse(jsonEncode(existing.content)) ??
+            LineNoteContent.fromJson(existing.content);
+        yield AnnotationDone(cached);
+        return;
+      }
     }
 
     final personaIdResolved = personaId ?? await _persona.selectedId();
-    final systemPrompt = await _persona.buildSystemPrompt(
-      personaIdResolved,
-      poemBody: poem.bodyText,
-      metaLine: '${poem.author} · ${poem.dynasty}',
-    );
+    final systemPrompt = await _buildPoemSystemPrompt(poem, personaIdResolved);
     final line = poem.paragraphs[lineIndex];
     final id = notebookEntryId(
       poemId: poem.id,
@@ -128,6 +161,10 @@ class AnnotationService {
       buildPartial: LineNoteContent.fromPartialSnapshot,
       finalize: (content) => content,
       persist: (content) async {
+        if (context.isTransient) {
+          context.session?.lineNotes[cacheKey] = content;
+          return;
+        }
         final now = DateTime.now();
         await _notebook.upsert(
           NotebookEntry(
@@ -152,12 +189,14 @@ class AnnotationService {
     int lineIndex, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) => _collectAnnotation(
     streamLineNote(
       poem,
       lineIndex,
       forceRegenerate: forceRegenerate,
       personaId: personaId,
+      context: context,
     ),
   );
 
@@ -166,28 +205,35 @@ class AnnotationService {
     Poem poem, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) async* {
-    final existing = await _notebook.byTarget(
-      poemId: poem.id,
-      kind: NotebookKind.essay,
-    );
-
-    if (existing != null && !forceRegenerate) {
-      final cached =
-          EssayContent.tryParse(jsonEncode(existing.content)) ??
-          EssayContent.fromJson(existing.content);
-      yield AnnotationDone(
-        cached.copyWith(wordNotes: _validWordNotes(poem, cached.wordNotes)),
+    if (context.isTransient) {
+      final cached = context.session?.essays[poem.id];
+      if (cached != null && !forceRegenerate) {
+        yield AnnotationDone(
+          cached.copyWith(wordNotes: _validWordNotes(poem, cached.wordNotes)),
+        );
+        return;
+      }
+    } else {
+      final existing = await _notebook.byTarget(
+        poemId: poem.id,
+        kind: NotebookKind.essay,
       );
-      return;
+
+      if (existing != null && !forceRegenerate) {
+        final cached =
+            EssayContent.tryParse(jsonEncode(existing.content)) ??
+            EssayContent.fromJson(existing.content);
+        yield AnnotationDone(
+          cached.copyWith(wordNotes: _validWordNotes(poem, cached.wordNotes)),
+        );
+        return;
+      }
     }
 
     final personaIdResolved = personaId ?? await _persona.selectedId();
-    final systemPrompt = await _persona.buildSystemPrompt(
-      personaIdResolved,
-      poemBody: poem.bodyText,
-      metaLine: '${poem.author} · ${poem.dynasty}',
-    );
+    final systemPrompt = await _buildPoemSystemPrompt(poem, personaIdResolved);
     final id = notebookEntryId(poemId: poem.id, kind: NotebookKind.essay);
 
     yield* _streamStructured<EssayContent>(
@@ -217,6 +263,10 @@ class AnnotationService {
       finalize: (content) =>
           content.copyWith(wordNotes: _validWordNotes(poem, content.wordNotes)),
       persist: (content) async {
+        if (context.isTransient) {
+          context.session?.essays[poem.id] = content;
+          return;
+        }
         final now = DateTime.now();
         await _notebook.upsert(
           NotebookEntry(
@@ -240,8 +290,14 @@ class AnnotationService {
     Poem poem, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) => _collectAnnotation(
-    streamEssay(poem, forceRegenerate: forceRegenerate, personaId: personaId),
+    streamEssay(
+      poem,
+      forceRegenerate: forceRegenerate,
+      personaId: personaId,
+      context: context,
+    ),
   );
 
   /// 用户在正文中选择词语后的解释。
@@ -254,31 +310,34 @@ class AnnotationService {
     SelectedWordPosition position, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) async {
     if (!_isValidPosition(poem, position)) {
       throw const SelectedWordValidationException('所选词语无法对应当前诗文，请重新选择');
     }
 
-    final existing = await _notebook.byTarget(
-      poemId: poem.id,
-      kind: NotebookKind.wordNote,
-      target: position.target,
-    );
-    if (existing != null && !forceRegenerate) {
-      final cached = WordNote.fromJson(existing.content);
-      if (cached != null &&
-          cached.isUserSelected &&
-          _matchesPosition(poem, position, cached)) {
-        return cached;
+    final cacheKey = _wordCacheKey(poem, position);
+    if (context.isTransient) {
+      final cached = context.session?.wordNotes[cacheKey];
+      if (cached != null && !forceRegenerate) return cached;
+    } else {
+      final existing = await _notebook.byTarget(
+        poemId: poem.id,
+        kind: NotebookKind.wordNote,
+        target: position.target,
+      );
+      if (existing != null && !forceRegenerate) {
+        final cached = WordNote.fromJson(existing.content);
+        if (cached != null &&
+            cached.isUserSelected &&
+            _matchesPosition(poem, position, cached)) {
+          return cached;
+        }
       }
     }
 
     final personaIdResolved = personaId ?? await _persona.selectedId();
-    final systemPrompt = await _persona.buildSystemPrompt(
-      personaIdResolved,
-      poemBody: poem.bodyText,
-      metaLine: '${poem.author} · ${poem.dynasty}',
-    );
+    final systemPrompt = await _buildPoemSystemPrompt(poem, personaIdResolved);
     final line = poem.paragraphs[position.lineIndex];
     final raw = await _completeAndParse<WordNote>(
       systemPrompt: systemPrompt,
@@ -313,6 +372,10 @@ class AnnotationService {
       source: WordNoteSource.selected,
       uncertain: raw.uncertain,
     );
+    if (context.isTransient) {
+      context.session?.wordNotes[cacheKey] = parsed;
+      return parsed;
+    }
     final now = DateTime.now();
     await _notebook.upsert(
       NotebookEntry(
@@ -336,7 +399,39 @@ class AnnotationService {
 
   /// 返回当前诗中仍能精确对应原文的缓存标记：L1 关键词和用户选词。
   /// L2 词语由打开赏析页时单独回传，避免把整篇赏析解析两次。
-  Future<List<WordNote>> cachedWordNotes(Poem poem) async {
+  Future<List<WordNote>> cachedWordNotes(
+    Poem poem, {
+    AnnotationContext context = const AnnotationContext.persistent(),
+  }) async {
+    if (context.isTransient) {
+      final notes = <WordNote>[];
+      final session = context.session;
+      if (session == null) return notes;
+      for (final entry in session.wordNotes.entries) {
+        if (!entry.key.startsWith('${poem.id}|')) continue;
+        final note = entry.value;
+        if (_matchesPosition(
+          poem,
+          SelectedWordPosition(
+            lineIndex: note.lineIndex ?? -1,
+            start: note.start ?? -1,
+            end: note.end ?? -1,
+            term: note.term,
+          ),
+          note,
+        )) {
+          notes.add(note);
+        }
+      }
+      for (final entry in session.lineNotes.entries) {
+        if (!entry.key.startsWith('${poem.id}|')) continue;
+        final lineIndex = int.tryParse(entry.key.split('|').last);
+        if (lineIndex == null) continue;
+        _appendLineNoteWords(poem, lineIndex, entry.value, notes);
+      }
+      return notes;
+    }
+
     final entries = await _notebook.byPoem(poem.id);
     final notes = <WordNote>[];
     for (final entry in entries) {
@@ -361,33 +456,46 @@ class AnnotationService {
 
       if (entry.kind != NotebookKind.lineNote) continue;
       final lineIndex = int.tryParse(entry.target ?? '');
-      if (lineIndex == null ||
-          lineIndex < 0 ||
-          lineIndex >= poem.paragraphs.length) {
-        continue;
-      }
-      final line = poem.paragraphs[lineIndex];
-      final lineNote = LineNoteContent.fromJson(entry.content);
-      for (final keyword in lineNote.notes) {
-        final term = keyword.term.trim();
-        final explain = keyword.explain.trim();
-        if (term.isEmpty || explain.isEmpty || !line.contains(term)) continue;
-        notes.add(
-          WordNote(
-            term: term,
-            explain: explain,
-            pinyin: keyword.pinyin,
-            lineIndex: lineIndex,
-          ),
-        );
-      }
+      if (lineIndex == null) continue;
+      _appendLineNoteWords(
+        poem,
+        lineIndex,
+        LineNoteContent.fromJson(entry.content),
+        notes,
+      );
     }
     return notes;
   }
 
+  void _appendLineNoteWords(
+    Poem poem,
+    int lineIndex,
+    LineNoteContent lineNote,
+    List<WordNote> notes,
+  ) {
+    if (lineIndex < 0 || lineIndex >= poem.paragraphs.length) return;
+    final line = poem.paragraphs[lineIndex];
+    for (final keyword in lineNote.notes) {
+      final term = keyword.term.trim();
+      final explain = keyword.explain.trim();
+      if (term.isEmpty || explain.isEmpty || !line.contains(term)) continue;
+      notes.add(
+        WordNote(
+          term: term,
+          explain: explain,
+          pinyin: keyword.pinyin,
+          lineIndex: lineIndex,
+        ),
+      );
+    }
+  }
+
   /// 返回当前诗中仍能精确对应原文的用户选词注。
-  Future<List<WordNote>> userWordNotes(Poem poem) async {
-    final notes = await cachedWordNotes(poem);
+  Future<List<WordNote>> userWordNotes(
+    Poem poem, {
+    AnnotationContext context = const AnnotationContext.persistent(),
+  }) async {
+    final notes = await cachedWordNotes(poem, context: context);
     return notes.where((note) => note.isUserSelected).toList();
   }
 
@@ -426,37 +534,47 @@ class AnnotationService {
     String question, {
     String? personaId,
     EssayContent? essay,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) async* {
     final cleanQuestion = question.trim();
     if (cleanQuestion.isEmpty) {
       throw const LlmException(LlmErrorKind.badResponse, '问题不能为空');
     }
 
-    final personaIdResolved = personaId ?? await _persona.selectedId();
-    final systemPrompt = await _persona.buildSystemPrompt(
-      personaIdResolved,
-      poemBody: poem.bodyText,
-      metaLine: '${poem.author} · ${poem.dynasty}',
-    );
+    final cacheKey = '${poem.id}|$cleanQuestion';
+    if (context.isTransient) {
+      final cached = context.session?.chatTurns[cacheKey];
+      if (cached != null) {
+        yield ChatDelta(cached.answer);
+        return;
+      }
+    }
 
-    final context = StringBuffer()
+    final personaIdResolved = personaId ?? await _persona.selectedId();
+    final systemPrompt = await _buildPoemSystemPrompt(poem, personaIdResolved);
+
+    final promptContext = StringBuffer()
       ..writeln('【本诗全文】')
       ..writeln(poem.bodyText);
-    final cachedEssay = essay ?? await _cachedEssay(poem.id);
+    final cachedEssay =
+        essay ??
+        (context.isTransient
+            ? context.session?.essays[poem.id]
+            : await _cachedEssay(poem.id));
     if (cachedEssay != null) {
-      context
+      promptContext
         ..writeln()
         ..writeln('【已有结构化赏析】')
         ..writeln(jsonEncode(cachedEssay.toJson()));
     }
-    context
+    promptContext
       ..writeln()
       ..writeln('【用户问题】')
       ..write(cleanQuestion);
 
     final messages = <LlmMessage>[
       LlmMessage('system', systemPrompt),
-      LlmMessage('user', context.toString()),
+      LlmMessage('user', promptContext.toString()),
     ];
     final answer = StringBuffer();
 
@@ -491,6 +609,15 @@ class AnnotationService {
       yield ChatDelta(fallback, replace: true);
     }
 
+    final chatTurn = ChatTurnContent(
+      question: cleanQuestion,
+      answer: answer.toString(),
+    );
+    if (context.isTransient) {
+      context.session?.chatTurns[cacheKey] = chatTurn;
+      return;
+    }
+
     final now = DateTime.now();
     final target = cleanQuestion.length > 160
         ? cleanQuestion.substring(0, 160)
@@ -505,10 +632,7 @@ class AnnotationService {
         poemId: poem.id,
         kind: NotebookKind.chatTurn,
         target: target,
-        content: ChatTurnContent(
-          question: cleanQuestion,
-          answer: answer.toString(),
-        ).toJson(),
+        content: chatTurn.toJson(),
         persona: personaIdResolved,
         userEdited: false,
         createdAt: now,
@@ -516,6 +640,11 @@ class AnnotationService {
       ),
     );
   }
+
+  String _lineCacheKey(Poem poem, String target) => '${poem.id}|$target';
+
+  String _wordCacheKey(Poem poem, SelectedWordPosition position) =>
+      '${poem.id}|${position.target}';
 
   List<WordNote> _validWordNotes(Poem poem, List<WordNote> notes) {
     final seen = <String>{};
@@ -532,6 +661,19 @@ class AnnotationService {
       if (valid.length == 8) break;
     }
     return valid;
+  }
+
+  Future<String> _buildPoemSystemPrompt(Poem poem, String personaId) async {
+    final prompt = await _persona.buildSystemPrompt(
+      personaId,
+      poemBody: poem.bodyText,
+      metaLine: '${poem.author} · ${poem.dynasty}',
+    );
+    if (!poem.isExtended) return prompt;
+    return '''$prompt
+
+【外部作品事实边界】
+这是一份由 AI 寻诗补充的外部作品。作者、时期、出处、推荐理由和原文版本均可能未经核验；只能把给出的正文作为艺术分析事实。不要根据元数据编造确定的历史背景或典故，无把握时将背景留空并标记为不确定。''';
   }
 
   Future<EssayContent?> _cachedEssay(String poemId) async {

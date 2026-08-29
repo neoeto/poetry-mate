@@ -6,32 +6,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/providers.dart';
+import '../../data/repositories/poem_catalog_repository.dart';
 import '../../domain/entities/notebook_entry.dart';
 import '../../domain/entities/poem.dart';
 import '../reader/notebook_editor.dart';
 
 class NotebookEntryWithPoem {
-  const NotebookEntryWithPoem({required this.entry, required this.poem});
+  const NotebookEntryWithPoem({
+    required this.entry,
+    required this.poem,
+    this.isExtended = false,
+  });
 
   final NotebookEntry entry;
   final Poem poem;
+  final bool isExtended;
 }
 
 final notebookEntriesWithPoemProvider =
     FutureProvider.autoDispose<List<NotebookEntryWithPoem>>((ref) async {
       final entries = await ref.watch(notebookRepositoryProvider).listAll();
-      final poemRepository = ref.watch(poemRepositoryProvider);
+      final catalog = ref.watch(poemCatalogRepositoryProvider);
       final poemIds = entries.map((entry) => entry.poemId).toSet();
-      final poems = await Future.wait(
-        poemIds.map((id) async => MapEntry(id, await poemRepository.byId(id))),
+      final resolved = await Future.wait(
+        poemIds.map((id) async => MapEntry(id, await catalog.byId(id))),
       );
-      final poemById = <String, Poem?>{
-        for (final item in poems) item.key: item.value,
-      };
+      final matchById = {for (final item in resolved) item.key: item.value};
       return [
         for (final entry in entries)
-          if (poemById[entry.poemId] case final poem?)
-            NotebookEntryWithPoem(entry: entry, poem: poem),
+          if (matchById[entry.poemId] case final match?)
+            NotebookEntryWithPoem(
+              entry: entry,
+              poem: match.poem,
+              isExtended: match.kind == PoemCatalogKind.extended,
+            ),
       ];
     });
 
@@ -65,7 +73,7 @@ class _NotebookList extends ConsumerWidget {
     for (final item in items) {
       final group = groups.putIfAbsent(
         item.poem.id,
-        () => _NotebookGroupData(poem: item.poem),
+        () => _NotebookGroupData(poem: item.poem, isExtended: item.isExtended),
       );
       group.entries.add(item);
     }
@@ -91,9 +99,10 @@ class _NotebookList extends ConsumerWidget {
 }
 
 class _NotebookGroupData {
-  _NotebookGroupData({required this.poem});
+  _NotebookGroupData({required this.poem, required this.isExtended});
 
   final Poem poem;
+  final bool isExtended;
   final List<NotebookEntryWithPoem> entries = [];
 }
 
@@ -118,7 +127,9 @@ class _NotebookGroup extends StatelessWidget {
           title: Text(poem.displayTitle.isEmpty ? '未命名诗篇' : poem.displayTitle),
           subtitle: Text('${poem.author} · ${poem.dynasty}'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/poem/${poem.id}'),
+          onTap: () => context.push(
+            group.isExtended ? '/extended-poem/${poem.id}' : '/poem/${poem.id}',
+          ),
         ),
         for (final item in group.entries)
           _NotebookEntryTile(item: item, onChanged: onChanged),

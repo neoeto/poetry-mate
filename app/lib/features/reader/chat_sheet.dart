@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/llm/annotation_service.dart';
 import '../../core/llm/llm_exception.dart';
 import '../../data/providers.dart';
 import '../../domain/entities/poem.dart';
@@ -16,10 +17,12 @@ class ChatSheet extends ConsumerStatefulWidget {
   const ChatSheet({
     super.key,
     required this.poem,
+    this.annotationContext,
     this.onOpenSettings,
   });
 
   final Poem poem;
+  final AnnotationContext? annotationContext;
   final VoidCallback? onOpenSettings;
 
   @override
@@ -59,9 +62,14 @@ class _ChatSheetState extends ConsumerState<ChatSheet> {
     _scrollToEnd();
 
     try {
-      final stream = ref.read(annotationServiceProvider).streamQuestion(
+      final stream = ref
+          .read(annotationServiceProvider)
+          .streamQuestion(
             widget.poem,
             question,
+            context:
+                widget.annotationContext ??
+                const AnnotationContext.persistent(),
           );
       await for (final delta in stream) {
         if (!mounted) return;
@@ -86,7 +94,6 @@ class _ChatSheetState extends ConsumerState<ChatSheet> {
         setState(() => _sending = false);
       }
     }
-
   }
 
   void _scrollToEnd() {
@@ -115,7 +122,9 @@ class _ChatSheetState extends ConsumerState<ChatSheet> {
               if (_error != null)
                 _ChatError(
                   error: _error,
-                  onRetry: _lastQuestion == null ? null : () => _send(_lastQuestion),
+                  onRetry: _lastQuestion == null
+                      ? null
+                      : () => _send(_lastQuestion),
                   onOpenSettings: widget.onOpenSettings,
                 ),
               _composer(context),
@@ -200,7 +209,10 @@ class _ChatHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text('问问这首诗', style: Theme.of(context).textTheme.titleMedium),
+            child: Text(
+              '问问这首诗',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           ),
           IconButton(
             tooltip: '关闭',
@@ -234,10 +246,10 @@ class _ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final background = fromUser ? scheme.primaryContainer : scheme.surfaceContainer;
-    final foreground = fromUser
-        ? scheme.onPrimaryContainer
-        : scheme.onSurface;
+    final background = fromUser
+        ? scheme.primaryContainer
+        : scheme.surfaceContainer;
+    final foreground = fromUser ? scheme.onPrimaryContainer : scheme.onSurface;
     return Align(
       alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -255,22 +267,19 @@ class _ChatBubble extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : fromUser
-                ? Text(text, style: TextStyle(color: foreground))
-                : MarkdownBody(
-                    data: text,
-                    // 流式回答中的单换行也要保留，便于阅读诗句和分点。
-                    softLineBreak: true,
-                    styleSheet: _chatMarkdownStyle(context, foreground),
-                  ),
+            ? Text(text, style: TextStyle(color: foreground))
+            : MarkdownBody(
+                data: text,
+                // 流式回答中的单换行也要保留，便于阅读诗句和分点。
+                softLineBreak: true,
+                styleSheet: _chatMarkdownStyle(context, foreground),
+              ),
       ),
     );
   }
 }
 
-MarkdownStyleSheet _chatMarkdownStyle(
-  BuildContext context,
-  Color foreground,
-) {
+MarkdownStyleSheet _chatMarkdownStyle(BuildContext context, Color foreground) {
   final theme = Theme.of(context);
   final body = theme.textTheme.bodyMedium!.copyWith(
     color: foreground,
@@ -324,10 +333,7 @@ MarkdownStyleSheet _chatMarkdownStyle(
     blockquoteDecoration: BoxDecoration(
       color: foreground.withValues(alpha: 0.05),
       border: Border(
-        left: BorderSide(
-          color: theme.colorScheme.primary,
-          width: 3,
-        ),
+        left: BorderSide(color: theme.colorScheme.primary, width: 3),
       ),
       borderRadius: BorderRadius.circular(3),
     ),
@@ -355,7 +361,8 @@ class _ChatError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final noKey = error is LlmException &&
+    final noKey =
+        error is LlmException &&
         (error! as LlmException).kind == LlmErrorKind.noKey;
     if (noKey) {
       return Padding(
@@ -365,10 +372,7 @@ class _ChatError extends StatelessWidget {
             const Icon(Icons.auto_awesome_outlined, size: 20),
             const SizedBox(width: 8),
             const Expanded(child: Text('还没有配置 AI')),
-            TextButton(
-              onPressed: onOpenSettings,
-              child: const Text('去配置'),
-            ),
+            TextButton(onPressed: onOpenSettings, child: const Text('去配置')),
           ],
         ),
       );
@@ -394,6 +398,7 @@ class _ChatError extends StatelessWidget {
 Future<void> showChatSheet(
   BuildContext context, {
   required Poem poem,
+  AnnotationContext? annotationContext,
   VoidCallback? onOpenSettings,
 }) {
   return showModalBottomSheet<void>(
@@ -402,6 +407,7 @@ Future<void> showChatSheet(
     showDragHandle: true,
     builder: (_) => ChatSheet(
       poem: poem,
+      annotationContext: annotationContext,
       onOpenSettings: onOpenSettings,
     ),
   );

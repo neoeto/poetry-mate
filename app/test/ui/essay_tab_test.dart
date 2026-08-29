@@ -269,6 +269,7 @@ class _FakeAnnotationService extends AnnotationService {
     Poem poem, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) {
     essayCalls++;
     final scripted = essayStream;

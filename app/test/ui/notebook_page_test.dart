@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/data/providers.dart';
+import 'package:poetry_mate/data/repositories/extended_poem_repository.dart';
 import 'package:poetry_mate/data/repositories/notebook_repository.dart';
+import 'package:poetry_mate/data/repositories/poem_catalog_repository.dart';
 import 'package:poetry_mate/data/repositories/poem_repository.dart';
 import 'package:poetry_mate/domain/entities/annotations.dart';
+import 'package:poetry_mate/domain/entities/extended_poem.dart';
 import 'package:poetry_mate/domain/entities/notebook_entry.dart';
 import 'package:poetry_mate/domain/entities/poem.dart';
 import 'package:poetry_mate/features/settings/notebook_page.dart';
@@ -72,6 +75,12 @@ void main() {
         overrides: [
           notebookRepositoryProvider.overrideWithValue(notebookRepository),
           poemRepositoryProvider.overrideWithValue(poemRepository),
+          poemCatalogRepositoryProvider.overrideWithValue(
+            PoemCatalogRepository(
+              publicRepository: poemRepository,
+              extendedRepository: _EmptyExtendedPoemRepository(),
+            ),
+          ),
         ],
         child: const MaterialApp(home: NotebookPage()),
       ),
@@ -141,6 +150,23 @@ class _FakeNotebookRepository implements NotebookRepository {
     required Map<String, dynamic> content,
     required int updatedAtMs,
   }) async {}
+
+  @override
+  Future<void> delete(String id) async {}
+}
+
+class _EmptyExtendedPoemRepository implements ExtendedPoemRepository {
+  @override
+  Future<ExtendedPoem?> byId(String id) async => null;
+
+  @override
+  Future<ExtendedPoem?> byFingerprint(String fingerprint) async => null;
+
+  @override
+  Future<void> save(ExtendedPoem poem) async {}
+
+  @override
+  Future<List<ExtendedPoem>> listByRecent() async => [];
 
   @override
   Future<void> delete(String id) async {}

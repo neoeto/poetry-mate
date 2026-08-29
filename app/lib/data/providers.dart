@@ -4,19 +4,24 @@
 /// 从而整棵 widget 树(Full App)可在无平台通道下测试。
 
 library;
+
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/compression/zstd_codec.dart';
 import '../core/db/app_database.dart';
 import '../features/browse/browse_filters.dart';
+import '../domain/entities/extended_poem.dart';
 import '../domain/entities/poem.dart';
 import '../core/llm/annotation_service.dart';
 import '../core/llm/llm_providers.dart';
 import '../core/llm/persona.dart';
+import '../core/llm/poem_finder_service.dart';
 import 'preferences/reading_prefs.dart';
+import 'repositories/extended_poem_repository.dart';
 import 'repositories/favorites_repository.dart';
 import 'repositories/notebook_repository.dart';
+import 'repositories/poem_catalog_repository.dart';
 import 'repositories/poem_repository.dart';
 import 'library/library_data_source.dart';
 import 'library/library_import_service.dart';
@@ -33,57 +38,93 @@ final poemRepositoryProvider = Provider<PoemRepository>(
 /// 分类页过滤键 → 实体查询参数
 typedef PoemFilter = (String? dynasty, String? type);
 
-PoemFilter filterOf(String key) =>
-    BrowseFilters.all.firstWhere((f) => f.key == key, orElse: () => const BrowseFilters(BrowseFilters.allKey, '全部', null, null))
-        .toQuery();
+PoemFilter filterOf(String key) => BrowseFilters.all
+    .firstWhere(
+      (f) => f.key == key,
+      orElse: () => const BrowseFilters(BrowseFilters.allKey, '全部', null, null),
+    )
+    .toQuery();
 
 /// 当前选中过滤键(UI 状态)
 final browseFilterProvider = StateProvider<String>((_) => BrowseFilters.allKey);
 
 /// 按过滤键拉取诗列表(autoDispose: 离开页面释放查询缓存)
-final filteredPoemsProvider =
-    FutureProvider.autoDispose.family<List<Poem>, String>((ref, key) async {
-  final repo = ref.watch(poemRepositoryProvider);
-  final (dynasty, type) = filterOf(key);
-  return repo.listByDynastyAndType(dynasty: dynasty, type: type, limit: 500);
-});
+final filteredPoemsProvider = FutureProvider.autoDispose
+    .family<List<Poem>, String>((ref, key) async {
+      final repo = ref.watch(poemRepositoryProvider);
+      final (dynasty, type) = filterOf(key);
+      return repo.listByDynastyAndType(
+        dynasty: dynasty,
+        type: type,
+        limit: 500,
+      );
+    });
 
 /// 按 id 取单首(阅读页深链)
-final poemByIdProvider =
-    FutureProvider.autoDispose.family<Poem?, String>((ref, id) {
+final poemByIdProvider = FutureProvider.autoDispose.family<Poem?, String>((
+  ref,
+  id,
+) {
   return ref.watch(poemRepositoryProvider).byId(id);
 });
 
+/// 用户保存的 AI 外部作品仓库。
+final extendedPoemRepositoryProvider = Provider<ExtendedPoemRepository>(
+  (ref) => DriftExtendedPoemRepository(ref.watch(appDatabaseProvider)),
+);
+
+/// 公共库优先、扩展库兜底的作品解析与去重服务。
+final poemCatalogRepositoryProvider = Provider<PoemCatalogRepository>((ref) {
+  return PoemCatalogRepository(
+    publicRepository: ref.watch(poemRepositoryProvider),
+    extendedRepository: ref.watch(extendedPoemRepositoryProvider),
+  );
+});
+
+final extendedPoemByIdProvider = FutureProvider.autoDispose
+    .family<ExtendedPoem?, String>((ref, id) {
+      return ref.watch(extendedPoemRepositoryProvider).byId(id);
+    });
+
+final visibleExtendedPoemsProvider =
+    FutureProvider.autoDispose<List<ExtendedPoem>>((ref) {
+      return ref.watch(poemCatalogRepositoryProvider).visibleExtendedPoems();
+    });
 
 final notebookRepositoryProvider = Provider<NotebookRepository>(
-    (ref) => DriftNotebookRepository(ref.watch(appDatabaseProvider)));
+  (ref) => DriftNotebookRepository(ref.watch(appDatabaseProvider)),
+);
 
 final libraryImportVersionStoreProvider =
     Provider<PrefsLibraryImportVersionStore>((ref) {
-  return PrefsLibraryImportVersionStore(ref.watch(prefsStoreProvider));
-});
+      return PrefsLibraryImportVersionStore(ref.watch(prefsStoreProvider));
+    });
 
 final libraryImportServiceProvider =
     Provider.family<LibraryImportService, String>((ref, baseUrl) {
-  final service = LibraryImportService(
-    source: HttpLibraryDataSource(baseUrl: baseUrl),
-    db: ref.watch(appDatabaseProvider),
-    versions: ref.watch(libraryImportVersionStoreProvider),
-    decompress: esZstdDecompress,
-  );
-  ref.onDispose(service.close);
-  return service;
-});
+      final service = LibraryImportService(
+        source: HttpLibraryDataSource(baseUrl: baseUrl),
+        db: ref.watch(appDatabaseProvider),
+        versions: ref.watch(libraryImportVersionStoreProvider),
+        decompress: esZstdDecompress,
+      );
+      ref.onDispose(service.close);
+      return service;
+    });
 
 final favoritesRepositoryProvider = Provider<FavoritesRepository>(
-    (ref) => DriftFavoritesRepository(ref.watch(appDatabaseProvider)));
+  (ref) => DriftFavoritesRepository(ref.watch(appDatabaseProvider)),
+);
 
-final readingPrefsProvider =
-    Provider<ReadingPrefs>((ref) => SharedReadingPrefs(ref.watch(sharedPreferencesAsyncProvider)));
+final readingPrefsProvider = Provider<ReadingPrefs>(
+  (ref) => SharedReadingPrefs(ref.watch(sharedPreferencesAsyncProvider)),
+);
 
 /// 收藏状态(阅读页心形);切换后 invalidate 刷新
-final isFavoriteProvider =
-    FutureProvider.autoDispose.family<bool, String>((ref, poemId) {
+final isFavoriteProvider = FutureProvider.autoDispose.family<bool, String>((
+  ref,
+  poemId,
+) {
   return ref.watch(favoritesRepositoryProvider).isFavorite(poemId);
 });
 
@@ -112,4 +153,12 @@ final annotationServiceProvider = Provider<AnnotationService>((ref) {
 /// 当前 AI 人格选择(只读响应式状态)
 final personaSelectionProvider = FutureProvider.autoDispose<String>((ref) {
   return ref.watch(personaServiceProvider).selectedId();
+});
+
+/// AI 寻诗服务：会话只在内存中存在，不依赖注本仓库。
+final poemFinderServiceProvider = Provider<PoemFinderService>((ref) {
+  return PoemFinderService(
+    llmClient: ref.watch(llmClientProvider),
+    personaService: ref.watch(personaServiceProvider),
+  );
 });

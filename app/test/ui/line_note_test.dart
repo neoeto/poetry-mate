@@ -436,6 +436,7 @@ class _FakeLineStreamingService extends AnnotationService {
     int lineIndex, {
     bool forceRegenerate = false,
     String? personaId,
+    AnnotationContext context = const AnnotationContext.persistent(),
   }) {
     lineCalls++;
     return lineStream;

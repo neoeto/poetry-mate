@@ -4,10 +4,14 @@
 /// (spec 场景: Tab 切换状态保持)。阅读页为顶层深链路由,便于后续分享直达。
 
 library;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../domain/entities/extended_poem.dart';
 import '../../features/browse/browse_page.dart';
+import '../../features/extended/ai_poem_finder_page.dart';
+import '../../features/extended/extended_library_page.dart';
 import '../../features/favorites/favorites_page.dart';
 import '../../features/settings/import_library_page.dart';
 import '../../features/settings/llm_settings_page.dart';
@@ -30,8 +34,7 @@ class TabSpec {
 const _tabs = <TabSpec>[
   TabSpec('/today', '今日', Icons.auto_stories_outlined, Icons.auto_stories),
   TabSpec('/browse', '分类', Icons.category_outlined, Icons.category),
-  TabSpec(
-      '/favorites', '收藏', Icons.favorite_border_outlined, Icons.favorite),
+  TabSpec('/favorites', '收藏', Icons.favorite_border_outlined, Icons.favorite),
   TabSpec('/settings', '我的', Icons.person_outline_outlined, Icons.person),
 ];
 
@@ -41,8 +44,7 @@ GoRouter buildAppRouter() {
     initialLocation: '/today',
     routes: [
       StatefulShellRoute.indexedStack(
-        builder: (context, state, shell) =>
-            HomeShell(navigationShell: shell),
+        builder: (context, state, shell) => HomeShell(navigationShell: shell),
         branches: [
           for (final tab in _tabs)
             StatefulShellBranch(
@@ -69,12 +71,32 @@ GoRouter buildAppRouter() {
         builder: (_, _) => const LlmSettingsPage(),
       ),
 
+      // AI 寻诗与扩展诗词库
+      GoRoute(path: '/ai-find', builder: (_, _) => const AiPoemFinderPage()),
+      GoRoute(
+        path: '/extended-library',
+        builder: (_, _) => const ExtendedLibraryPage(),
+      ),
+      GoRoute(
+        path: '/extended-poem/:id',
+        builder: (_, state) =>
+            ExtendedPoemRoutePage(poemId: state.pathParameters['id'] ?? ''),
+      ),
+      GoRoute(
+        path: '/poem-preview',
+        builder: (_, state) {
+          final draft = state.extra;
+          return draft is ExtendedPoemDraft
+              ? TransientPoemPage(draft: draft)
+              : const Scaffold(body: Center(child: Text('临时作品已失效，请重新寻诗')));
+        },
+      ),
+
       // 阅读页顶层深链
       GoRoute(
         path: '/poem/:id',
-        builder: (context, state) => PoemRoutePage(
-          poemId: state.pathParameters['id'] ?? '',
-        ),
+        builder: (context, state) =>
+            PoemRoutePage(poemId: state.pathParameters['id'] ?? ''),
       ),
     ],
   );

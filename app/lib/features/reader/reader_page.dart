@@ -12,6 +12,7 @@ import 'package:flutter/rendering.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/llm/annotation_service.dart';
 import '../../core/ui/app_theme.dart';
 import '../../data/preferences/reading_settings_controller.dart';
 import '../../data/providers.dart';
@@ -24,9 +25,16 @@ import 'word_explanation_sheet.dart';
 final _punctuationPattern = RegExp(r'[\p{P}\u3000]', unicode: true);
 
 class ReaderPage extends ConsumerStatefulWidget {
-  const ReaderPage({super.key, required this.poem});
+  const ReaderPage({
+    super.key,
+    required this.poem,
+    this.annotationContext,
+    this.sourceInfo,
+  });
 
   final Poem poem;
+  final AnnotationContext? annotationContext;
+  final PoemSourceInfo? sourceInfo;
 
   @override
   ConsumerState<ReaderPage> createState() => _ReaderPageState();
@@ -35,6 +43,7 @@ class ReaderPage extends ConsumerStatefulWidget {
 class _ReaderPageState extends ConsumerState<ReaderPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final AnnotationContext _annotationContext;
   var _essayRequested = false;
   List<WordNote> _automaticWordNotes = const [];
   List<WordNote> _cachedWordNotes = const [];
@@ -52,6 +61,8 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
   @override
   void initState() {
     super.initState();
+    _annotationContext =
+        widget.annotationContext ?? const AnnotationContext.persistent();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_onTabChanged);
     // 已有的 L1 关键词和用户选词注不应要求用户再次触发生成才出现。
@@ -93,7 +104,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
     try {
       final notes = await ref
           .read(annotationServiceProvider)
-          .cachedWordNotes(widget.poem);
+          .cachedWordNotes(widget.poem, context: _annotationContext);
       if (mounted) setState(() => _cachedWordNotes = notes);
     } catch (_) {
       // 测试/降级环境可能没有数据库注入；不影响正文阅读。
@@ -105,6 +116,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
       context,
       poem: widget.poem,
       position: position,
+      annotationContext: _annotationContext,
       onChanged: _loadCachedWordNotes,
       onOpenSettings: () {
         Navigator.of(context).pop();
@@ -135,6 +147,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
         end: end,
         term: note.term,
       ),
+      annotationContext: _annotationContext,
       onChanged: _loadCachedWordNotes,
       onOpenSettings: () {
         Navigator.of(context).pop();
@@ -189,6 +202,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                 poem: widget.poem,
                 renderLine: renderLine,
                 bodyStyle: bodyStyle,
+                sourceInfo: widget.sourceInfo,
                 wordNotes: _wordNotes,
                 onWordTap: _showWordNote,
                 onWordSelected: _explainSelectedWord,
@@ -197,6 +211,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
                   poem: widget.poem,
                   lineIndex: index,
                   line: widget.poem.paragraphs[index],
+                  annotationContext: _annotationContext,
                   onNoteReady: (note) => _onLineNoteReady(index, note),
                   onOpenSettings: () {
                     Navigator.of(context).pop();
@@ -207,6 +222,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage>
               _essayRequested
                   ? EssayTab(
                       poem: widget.poem,
+                      annotationContext: _annotationContext,
                       onContentReady: _onEssayReady,
                       onOpenSettings: () => context.push('/settings/llm'),
                     )
@@ -224,6 +240,7 @@ class _OriginalPoemView extends StatefulWidget {
     required this.poem,
     required this.renderLine,
     required this.bodyStyle,
+    this.sourceInfo,
     required this.wordNotes,
     required this.onWordTap,
     required this.onWordSelected,
@@ -233,6 +250,7 @@ class _OriginalPoemView extends StatefulWidget {
   final Poem poem;
   final String Function(String line) renderLine;
   final TextStyle bodyStyle;
+  final PoemSourceInfo? sourceInfo;
   final List<WordNote> wordNotes;
   final ValueChanged<WordNote> onWordTap;
   final Future<void> Function(SelectedWordPosition position) onWordSelected;
@@ -277,6 +295,10 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
+          if (widget.sourceInfo != null) ...[
+            const SizedBox(height: 12),
+            _PoemSourceBanner(info: widget.sourceInfo!),
+          ],
 
           // ── 细线分隔(留白之外的唯一装饰) ──
           Padding(
@@ -707,6 +729,49 @@ List<_WordMatch> _findWordMatches(
     occupiedUntil = candidate.end;
   }
   return accepted;
+}
+
+class _PoemSourceBanner extends StatelessWidget {
+  const _PoemSourceBanner({required this.info});
+
+  final PoemSourceInfo info;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final source = info.source?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.auto_awesome_outlined,
+            size: 18,
+            color: scheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              [
+                info.label,
+                if (source != null && source.isNotEmpty) '出处：$source',
+                if (info.isUncertain) '部分信息待核，仅供参考',
+              ].join(' · '),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EssayNotSelected extends StatelessWidget {

@@ -5,6 +5,7 @@
 /// - [id] 由数据包下发(内容寻址),APP 侧从不计算。
 
 library;
+
 import 'dart:convert';
 
 class Poem {
@@ -42,20 +43,23 @@ class Poem {
   /// 是否为词(影响排版细节)
   bool get isCi => type == 'ci';
 
+  /// 是否为 AI 补充的扩展作品。
+  bool get isExtended => sourceCollection == 'ai_extended';
+
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'author': author,
-        'title': title,
-        'dynasty': dynasty,
-        'type': type,
-        'paragraphs': paragraphs,
-        'preface': preface,
-        'rhythmic': rhythmic,
-        'popularity': popularity,
-        'raw_text': rawText,
-        'tags': tags,
-        'source_collection': sourceCollection,
-      };
+    'id': id,
+    'author': author,
+    'title': title,
+    'dynasty': dynasty,
+    'type': type,
+    'paragraphs': paragraphs,
+    'preface': preface,
+    'rhythmic': rhythmic,
+    'popularity': popularity,
+    'raw_text': rawText,
+    'tags': tags,
+    'source_collection': sourceCollection,
+  };
 
   /// 从 ETL 统一 schema 的 JSON 记录构造(种子集装载路径)。
   factory Poem.fromPackageJson(Map<String, dynamic> json) {
@@ -85,6 +89,29 @@ class Poem {
 }
 
 /// JSON 数组列的编解码工具(与 mapper 共用)。
+/// 阅读页显示的作品来源信息。
+///
+/// 公共诗库不需要传入此对象；扩展作品用它展示来源和待核字段，避免把
+/// AI 返回的元数据当成已经核验的历史事实。
+class PoemSourceInfo {
+  const PoemSourceInfo({
+    required this.label,
+    this.source,
+    this.confidence = 'unknown',
+    this.uncertainFields = const {},
+  });
+
+  final String label;
+  final String? source;
+  final String confidence;
+  final Set<String> uncertainFields;
+
+  bool get isUncertain => confidence != 'known' || uncertainFields.isNotEmpty;
+
+  bool isFieldUncertain(String field) =>
+      uncertainFields.contains(field) || confidence != 'known';
+}
+
 class JsonListCodec {
   const JsonListCodec._();
 
