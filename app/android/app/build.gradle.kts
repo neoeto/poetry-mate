@@ -7,9 +7,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// 发布签名(可选):
-//   本地开发无需配置,release 回退到 debug 签名,产物仍可直接安装;
-//   正式发布在 android/key.properties 提供 keystore(不入库),或由 CI 注入。
+// 发布签名:
+//   本地开发未配置时,release 回退到 debug 签名,产物仅适合临时测试;
+//   正式发布在 android/key.properties 提供固定 keystore(不入库),CI 可通过环境变量强制要求。
 // 注意: 脚本顶层不能用 const val,用普通 val。
 val KEY_PROPS_FILE = "key.properties"
 
@@ -18,10 +18,14 @@ val signingFile = rootProject.file(KEY_PROPS_FILE)
 if (signingFile.exists()) {
     signingFile.inputStream().use(signing::load)
 }
-val hasSigning = signing.getProperty("storeFile") != null &&
-    signing.getProperty("storePassword") != null &&
-    signing.getProperty("keyAlias") != null &&
-    signing.getProperty("keyPassword") != null
+val hasSigning = listOf(
+    "storeFile",
+    "storePassword",
+    "keyAlias",
+    "keyPassword",
+).all { !signing.getProperty(it).isNullOrBlank() }
+val requireReleaseSigning =
+    System.getenv("POETRY_MATE_REQUIRE_RELEASE_SIGNING") == "true"
 
 android {
     namespace = "com.poetrymate.poetry_mate"
@@ -59,11 +63,13 @@ android {
 
     buildTypes {
         release {
-            // 配置了 key.properties 则使用正式签名,否则回退 debug 签名(可直接安装)。
-            signingConfig = if (hasSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
+            // CI 发布包必须使用固定签名；本地未配置时仍允许 debug release 便于开发调试。
+            signingConfig = when {
+                hasSigning -> signingConfigs.getByName("release")
+                requireReleaseSigning -> error(
+                    "Release signing is required, but android/key.properties is missing or incomplete",
+                )
+                else -> signingConfigs.getByName("debug")
             }
         }
     }

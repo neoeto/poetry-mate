@@ -60,6 +60,19 @@ cd server && npm install && npm run dev
 
 ## 运维手册
 
+### Android 发布签名
+
+GitHub Actions 的 Android release 构建必须使用固定的 release keystore；未配置签名密钥时流水线会直接失败，禁止生成无法持续更新的 debug 签名包。
+
+在仓库 Settings → Secrets and variables → Actions 中配置：
+
+- `ANDROID_KEYSTORE_BASE64`：keystore 文件的 base64 内容
+- `ANDROID_KEYSTORE_PASSWORD`：store password
+- `ANDROID_KEY_ALIAS`：key alias
+- `ANDROID_KEY_PASSWORD`：key password
+
+keystore 私钥不得提交到仓库。所有后续 APK/AAB 必须继续使用同一 keystore，否则 Android 会将其视为不同签名的应用，无法覆盖更新。若旧版本使用的签名私钥已经丢失，只能卸载旧版本后重新安装，或恢复原 keystore。
+
 ### ① 触发构建发布
 
 | 方式 | 操作 |

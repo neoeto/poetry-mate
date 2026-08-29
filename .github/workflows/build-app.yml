@@ -1,14 +1,14 @@
 # Poetry Mate APP 打包流水线
 #
 # 产出:
-#   - Android: release APK(可选 AAB) —— 有 keystore 则正式签名,否则 debug 签名(可直接安装)
+#   - Android: release APK(可选 AAB) —— 必须使用固定 release keystore 签名
 #   - iOS: 未签名 device .app + .ipa(无需任何 Apple 密钥);提供 Apple 签名密钥后可产出正式签名 IPA
 #
 # 触发:
 #   - 手动 workflow_dispatch(可指定数据源地址 / 是否打 AAB / 是否跳过测试)
 #   - 推送 v* tag 自动构建
 #
-# 可选 secrets(不配置也能构建出可安装包):
+# 必需 secrets:
 #   Android 签名:
 #     ANDROID_KEYSTORE_BASE64   —— keystore 文件的 base64(如 base64 -i key.jks)
 #     ANDROID_KEYSTORE_PASSWORD —— storePassword
@@ -61,6 +61,9 @@ jobs:
   android:
     name: Android APK
     runs-on: ubuntu-latest
+    env:
+      # 发布包禁止回退到每次 runner 都可能不同的 debug keystore。
+      POETRY_MATE_REQUIRE_RELEASE_SIGNING: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -91,9 +94,8 @@ jobs:
         working-directory: app
         run: flutter test
 
-      # 注入发布签名: 提供 ANDROID_KEYSTORE_BASE64 时生成 key.properties,
-      # build.gradle.kts 检测到后自动使用正式签名;否则回退 debug 签名。
-      - name: Configure Android release signing (optional)
+      # 注入发布签名。发布流水线缺少固定 keystore 时必须失败，禁止回退 debug 签名。
+      - name: Configure Android release signing
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -101,10 +103,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -z "${KEYSTORE_B64:-}" ]]; then
-            echo "未配置 ANDROID_KEYSTORE_BASE64,release 将使用 debug 签名(可直接安装)"
-            exit 0
-          fi
+          : "${KEYSTORE_B64:?未配置 ANDROID_KEYSTORE_BASE64}"
+          : "${STORE_PASSWORD:?未配置 ANDROID_KEYSTORE_PASSWORD}"
+          : "${KEY_ALIAS:?未配置 ANDROID_KEY_ALIAS}"
+          : "${KEY_PASSWORD:?未配置 ANDROID_KEY_PASSWORD}"
+
           printf '%s' "$KEYSTORE_B64" | base64 --decode > app/android/key.jks
           cat > app/android/key.properties <<EOF
           storeFile=key.jks
@@ -112,6 +115,14 @@ jobs:
           keyAlias=$KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           EOF
+
+          # 尽早验证 base64、store password 和 alias，避免构建出不可更新的包。
+          keytool -list \
+            -keystore app/android/key.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            >/dev/null
+          echo "Android release keystore 已加载"
 
       - name: Build APK
         working-directory: app
@@ -122,6 +133,15 @@ jobs:
             CMD+=(--dart-define=POETRY_MATE_DATA_URL="$DATA_URL")
           fi
           "${CMD[@]}"
+
+      - name: Verify Android release signature
+        working-directory: app
+        run: |
+          set -euo pipefail
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs \
+            build/app/outputs/flutter-apk/app-release.apk
 
       - name: Build App Bundle (optional)
         if: ${{ inputs.build_appbundle == true }}
