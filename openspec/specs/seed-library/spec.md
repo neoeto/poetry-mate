@@ -5,9 +5,7 @@
 内置种子集装载(幂等+版本标记)与本地诗库表结构。
 
 # 种子集诗库（seed-library）
-
 ## Requirements
-
 ### Requirement: 内置种子集随安装包分发
 安装包 SHALL 内置种子集数据资产（`assets/seed/seed.json.zst`，zstd 压缩 JSON，格式与 build-data-pipeline 的分卷产物同构）；首次启动 SHALL 自动完成装载，全程无需网络与用户操作。
 
@@ -42,12 +40,16 @@ SQLite SHALL 建立 poems 表，字段至少包含：`id`（TEXT 主键，来自
 - **THEN** poems 表作为 schema v1 存在于迁移序列中，可供后续版本追加步骤
 
 ### Requirement: 诗实体经仓库访问
-应用 SHALL 通过诗仓库（PoemRepository）提供按 id 获取、按朝代/类型列出、全量计数等最小查询能力；本阶段 MUST NOT 实现关键词检索（属 search 变更）。
+应用 SHALL 通过诗仓库（PoemRepository）提供按 id 获取、按朝代/类型列出、关键词搜索、全量计数等查询能力；关键词搜索 SHALL 只访问本地 SQLite，覆盖诗名、作者、词牌、正文和题材标签。应用 MUST NOT 为搜索请求依赖网络或 LLM。
 
 #### Scenario: 按 id 获取单首诗
 - **WHEN** 以某首种子诗的 id 调用仓库获取接口
 - **THEN** 返回字段完整的诗实体
 
-#### Scenario: 检索能力明确缺席
-- **WHEN** 审视仓库公开接口
-- **THEN** 不存在任何关键词搜索方法
+#### Scenario: 本地关键词搜索
+- **WHEN** 以诗名、作者或正文关键词调用仓库搜索接口
+- **THEN** 返回本地诗库中匹配的诗实体，并按稳定顺序和结果上限返回
+
+#### Scenario: 离线仓库查询
+- **WHEN** 设备无网络时调用诗仓库搜索
+- **THEN** 搜索仍可读取本地结果且不发起网络请求

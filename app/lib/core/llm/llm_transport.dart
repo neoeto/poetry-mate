@@ -30,12 +30,17 @@ class HttpLlmTransport implements LlmTransport {
   HttpLlmTransport({
     this.connectTimeout = const Duration(seconds: 15),
     this.receiveTimeout = const Duration(seconds: 120),
+    this.idleTimeout = const Duration(seconds: 30),
     HttpClient? client,
-  })  : _client = client ?? HttpClient(),
-        _externalClient = client != null;
+  }) : _client = client ?? HttpClient(),
+       _externalClient = client != null;
 
   final Duration connectTimeout;
   final Duration receiveTimeout;
+
+  /// 流式响应帧间空闲超时(首字节走 [receiveTimeout])。
+  /// 取值须显著大于常规 token 间隔,避免误伤深度思考型模型的静默期。
+  final Duration idleTimeout;
   final HttpClient _client;
   final bool _externalClient;
 
@@ -57,10 +62,7 @@ class HttpLlmTransport implements LlmTransport {
           .join()
           .timeout(receiveTimeout);
     } on TimeoutException {
-      throw const LlmException(
-        LlmErrorKind.network,
-        '响应超时，请检查网络或稍后再试',
-      );
+      throw const LlmException(LlmErrorKind.network, '响应超时，请检查网络或稍后再试');
     } on LlmException {
       rethrow;
     } on Object catch (error) {
@@ -89,10 +91,7 @@ class HttpLlmTransport implements LlmTransport {
       try {
         text = await response.transform(utf8.decoder).join();
       } on TimeoutException {
-        throw const LlmException(
-          LlmErrorKind.network,
-          '响应超时，请检查网络或稍后再试',
-        );
+        throw const LlmException(LlmErrorKind.network, '响应超时，请检查网络或稍后再试');
       } on LlmException {
         rethrow;
       } on Object catch (error) {
@@ -101,11 +100,35 @@ class HttpLlmTransport implements LlmTransport {
       throw _statusError(response.statusCode, text);
     }
     try {
-      yield* response;
+      yield* _applyStreamTimeouts(response);
     } on LlmException {
       rethrow;
     } on Object catch (error) {
       throw _networkError(error);
+    }
+  }
+
+  /// 对流式响应体施加超时:首字节等待 [receiveTimeout],此后每帧等待 [idleTimeout]。
+  /// 防止供应商建连后停滞导致流永久挂起;超时统一映射为产品化网络错误。
+  Stream<List<int>> _applyStreamTimeouts(Stream<List<int>> source) async* {
+    final reader = StreamIterator<List<int>>(source);
+    var firstChunk = true;
+    try {
+      while (true) {
+        final bool hasChunk;
+        try {
+          hasChunk = await reader.moveNext().timeout(
+            firstChunk ? receiveTimeout : idleTimeout,
+          );
+        } on TimeoutException {
+          throw const LlmException(LlmErrorKind.network, '响应超时，请检查网络或稍后再试');
+        }
+        if (!hasChunk) break;
+        firstChunk = false;
+        yield reader.current;
+      }
+    } finally {
+      await reader.cancel();
     }
   }
 
@@ -166,9 +189,7 @@ class HttpLlmTransport implements LlmTransport {
       final detail = _safeErrorDetail(error.message);
       return LlmException(
         LlmErrorKind.network,
-        detail.isEmpty
-            ? '网络请求参数无效，请检查 Base URL'
-            : '网络请求参数无效：$detail',
+        detail.isEmpty ? '网络请求参数无效，请检查 Base URL' : '网络请求参数无效：$detail',
       );
     }
     if (error is FormatException) {
@@ -191,10 +212,7 @@ class HttpLlmTransport implements LlmTransport {
       RegExp(r'Bearer\s+[^ )]+', caseSensitive: false),
       'Bearer ***',
     );
-    text = text.replaceAll(
-      RegExp(r'\bsk-[A-Za-z0-9._-]+\b'),
-      '***',
-    );
+    text = text.replaceAll(RegExp(r'\bsk-[A-Za-z0-9._-]+\b'), '***');
     return text.length > 180 ? '${text.substring(0, 180)}…' : text;
   }
 
@@ -204,8 +222,9 @@ class HttpLlmTransport implements LlmTransport {
 
 /// 状态码 → 产品化异常(公开纯函数,便于测试)
 LlmException statusToError(int statusCode, String bodySnippet) {
-  final excerpt =
-      bodySnippet.length > 200 ? '${bodySnippet.substring(0, 200)}…' : bodySnippet;
+  final excerpt = bodySnippet.length > 200
+      ? '${bodySnippet.substring(0, 200)}…'
+      : bodySnippet;
   switch (statusCode) {
     case 401 || 403:
       return LlmException(LlmErrorKind.auth, '密钥无效（$statusCode）：$excerpt');
@@ -215,6 +234,9 @@ LlmException statusToError(int statusCode, String bodySnippet) {
       if (statusCode >= 500) {
         return LlmException(LlmErrorKind.server, '服务异常（$statusCode）：$excerpt');
       }
-      return LlmException(LlmErrorKind.badResponse, '请求被拒绝（$statusCode）：$excerpt');
+      return LlmException(
+        LlmErrorKind.badResponse,
+        '请求被拒绝（$statusCode）：$excerpt',
+      );
   }
 }

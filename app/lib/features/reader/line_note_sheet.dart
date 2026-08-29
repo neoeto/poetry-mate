@@ -4,6 +4,8 @@
 /// 这里仅负责渐进式反馈，不把供应商原始错误或堆栈展示给用户。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -35,32 +37,109 @@ class LineNoteSheet extends ConsumerStatefulWidget {
   ConsumerState<LineNoteSheet> createState() => _LineNoteSheetState();
 }
 
+enum _LineNotePhase { loading, streaming, done, error }
+
 class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
-  late Future<LineNoteContent> _noteFuture;
+  StreamSubscription<AnnotationEvent<LineNoteContent>>? _subscription;
+  _LineNotePhase _phase = _LineNotePhase.loading;
+  LineNoteContent? _note;
+  Object? _error;
+  Set<String> _closedKeys = const {};
+  Set<String> _pendingKeys = const {};
+  var _generation = 0;
 
   @override
   void initState() {
     super.initState();
-    _noteFuture = _load();
+    _startStream();
   }
 
-  Future<LineNoteContent> _load({bool forceRegenerate = false}) async {
-    final note = await ref
+  void _startStream({bool forceRegenerate = false}) {
+    final generation = ++_generation;
+    final oldSubscription = _subscription;
+    _subscription = null;
+    oldSubscription?.cancel();
+
+    void reset() {
+      _phase = _LineNotePhase.loading;
+      _note = null;
+      _error = null;
+      _closedKeys = const {};
+      _pendingKeys = const {};
+    }
+
+    if (mounted) {
+      setState(reset);
+    } else {
+      reset();
+    }
+
+    final stream = ref
         .read(annotationServiceProvider)
-        .getOrCreateLineNote(
+        .streamLineNote(
           widget.poem,
           widget.lineIndex,
           forceRegenerate: forceRegenerate,
         );
-    if (mounted) widget.onNoteReady?.call(note);
-    return note;
+    _subscription = stream.listen(
+      (event) {
+        if (!mounted || generation != _generation) return;
+        _handleEvent(event);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!mounted || generation != _generation) return;
+        setState(() {
+          _phase = _LineNotePhase.error;
+          _error = error;
+        });
+      },
+      onDone: () {
+        if (!mounted || generation != _generation) return;
+        if (_phase != _LineNotePhase.done && _phase != _LineNotePhase.error) {
+          setState(() {
+            _phase = _LineNotePhase.error;
+            _error = const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
+          });
+        }
+      },
+    );
   }
 
-  void _retry() {
-    setState(() {
-      _noteFuture = _load();
-    });
+  void _handleEvent(AnnotationEvent<LineNoteContent> event) {
+    if (event is AnnotationReset) {
+      setState(() {
+        _phase = _LineNotePhase.loading;
+        _note = null;
+        _closedKeys = const {};
+        _pendingKeys = const {};
+      });
+      return;
+    }
+    if (event is AnnotationPartial) {
+      final partialEvent = event as AnnotationPartial<dynamic>;
+      final partial = partialEvent.content as LineNoteContent;
+      setState(() {
+        _phase = _LineNotePhase.streaming;
+        _note = partial;
+        _closedKeys = Set<String>.from(partialEvent.closedKeys);
+        _pendingKeys = Set<String>.from(partialEvent.pendingKeys);
+      });
+      return;
+    }
+    if (event is AnnotationDone) {
+      final doneEvent = event as AnnotationDone<dynamic>;
+      final note = doneEvent.content as LineNoteContent;
+      setState(() {
+        _phase = _LineNotePhase.done;
+        _note = note;
+        _closedKeys = const {};
+        _pendingKeys = const {};
+      });
+      widget.onNoteReady?.call(note);
+    }
   }
+
+  void _retry() => _startStream();
 
   Future<NotebookEntry?> _entry() {
     return ref
@@ -87,9 +166,14 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
       userEdited: entry?.userEdited ?? false,
     );
     if (!confirmed || !mounted) return;
-    setState(() {
-      _noteFuture = _load(forceRegenerate: true);
-    });
+    _startStream(forceRegenerate: true);
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -129,32 +213,83 @@ class _LineNoteSheetState extends ConsumerState<LineNoteSheet> {
               ),
               const SizedBox(height: 16),
               Flexible(
-                child: FutureBuilder<LineNoteContent>(
-                  future: _noteFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const _LineNoteLoading();
-                    }
-                    if (snapshot.hasError) {
-                      return _LineNoteError(
-                        error: snapshot.error,
-                        onRetry: _retry,
-                        onOpenSettings: widget.onOpenSettings,
-                      );
-                    }
-                    final note = snapshot.data;
-                    if (note == null) return _LineNoteError(onRetry: _retry);
-                    return _LineNoteResult(
-                      note: note,
-                      onEdit: _edit,
-                      onRegenerate: _regenerate,
-                    );
-                  },
-                ),
+                child: switch (_phase) {
+                  _LineNotePhase.loading => const _LineNoteLoading(),
+                  _LineNotePhase.streaming =>
+                    _note == null
+                        ? const _LineNoteLoading()
+                        : _LineNoteStreaming(
+                            note: _note!,
+                            closedKeys: _closedKeys,
+                            pendingKeys: _pendingKeys,
+                          ),
+                  _LineNotePhase.done =>
+                    _note == null
+                        ? _LineNoteError(onRetry: _retry)
+                        : _LineNoteResult(
+                            note: _note!,
+                            onEdit: _edit,
+                            onRegenerate: _regenerate,
+                          ),
+                  _LineNotePhase.error => _LineNoteError(
+                    error: _error,
+                    onRetry: _retry,
+                    onOpenSettings: widget.onOpenSettings,
+                  ),
+                },
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _LineNoteStreaming extends StatelessWidget {
+  const _LineNoteStreaming({
+    required this.note,
+    required this.closedKeys,
+    required this.pendingKeys,
+  });
+
+  final LineNoteContent note;
+  final Set<String> closedKeys;
+  final Set<String> pendingKeys;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final translationReady = closedKeys.contains('translation');
+    final notesStarted =
+        closedKeys.contains('notes') || pendingKeys.contains('notes');
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('白话', style: textTheme.labelLarge),
+          const SizedBox(height: 6),
+          Text(
+            translationReady
+                ? (note.translation.isEmpty ? '模型未提供直译。' : note.translation)
+                : '生成中…',
+            style: textTheme.bodyLarge,
+          ),
+          if (notesStarted) ...[
+            const SizedBox(height: 18),
+            Text('关键词注', style: textTheme.labelLarge),
+            const SizedBox(height: 6),
+            for (final item in note.notes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '${item.term}${item.pinyin.trim().isEmpty ? '' : '（${item.pinyin.trim()}）'}：${item.explain.isEmpty ? '未提供释义。' : item.explain}',
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+            if (!closedKeys.contains('notes')) const Text('生成中…'),
+          ],
+        ],
       ),
     );
   }

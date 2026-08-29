@@ -32,8 +32,9 @@ void main() {
   Future<void> pumpReader(
     WidgetTester tester,
     Poem poem,
-    _FakeAnnotationService annotationService,
-  ) async {
+    _FakeAnnotationService annotationService, {
+    bool settle = true,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -45,7 +46,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   testWidgets('首次切换赏析才请求，骨架完成后渲染结构化内容', (tester) async {
@@ -153,10 +154,100 @@ void main() {
     expect(find.text('意境'), findsNWidgets(2));
     expect(service.essayCalls, 1);
   });
+
+  testWidgets('赏析按已闭合字段渐进渲染,完成前不显示编辑入口', (tester) async {
+    final controller = StreamController<AnnotationEvent<EssayContent>>();
+    addTearDown(controller.close);
+    final service = _FakeAnnotationService(
+      Future.value(
+        const EssayContent(
+          summary: '',
+          craft: [],
+          mood: '',
+          background: EssayBackground(text: '', uncertain: true),
+        ),
+      ),
+      essayStream: controller.stream,
+    );
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem, service, settle: false);
+
+    await tester.tap(find.text('赏析'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('essay-skeleton')), findsOneWidget);
+    expect(controller.hasListener, isTrue);
+
+    controller.add(
+      const AnnotationPartial<EssayContent>(
+        EssayContent(
+          summary: '先到的大意',
+          craft: [],
+          mood: '',
+          background: EssayBackground(text: '', uncertain: true),
+        ),
+        closedKeys: {'summary'},
+        pendingKeys: {'craft', 'mood', 'background'},
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('大意'), findsOneWidget);
+    expect(find.text('先到的大意'), findsOneWidget);
+    expect(find.text('生成中…'), findsWidgets);
+    expect(find.text('模型未提供此部分内容。'), findsNothing);
+    expect(find.text('编辑注本'), findsNothing);
+
+    controller.add(
+      const AnnotationDone<EssayContent>(
+        EssayContent(
+          summary: '最终大意',
+          craft: [],
+          mood: '最终意境',
+          background: EssayBackground(text: '', uncertain: true),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('最终大意'), findsOneWidget);
+    expect(find.text('最终意境'), findsOneWidget);
+    expect(find.text('编辑注本'), findsOneWidget);
+  });
+
+  testWidgets('离开赏析页签时取消流式订阅', (tester) async {
+    var cancelled = false;
+    final controller = StreamController<AnnotationEvent<EssayContent>>(
+      onCancel: () {
+        cancelled = true;
+      },
+    );
+    final service = _FakeAnnotationService(
+      Future.value(
+        const EssayContent(
+          summary: '',
+          craft: [],
+          mood: '',
+          background: EssayBackground(text: '', uncertain: true),
+        ),
+      ),
+      essayStream: controller.stream,
+    );
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem, service, settle: false);
+
+    await tester.tap(find.text('赏析'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(cancelled, isTrue);
+  });
 }
 
 class _FakeAnnotationService extends AnnotationService {
-  _FakeAnnotationService(this.essayFuture)
+  _FakeAnnotationService(this.essayFuture, {this.essayStream})
     : super(
         notebookRepository: _NoopNotebookRepository(),
         llmClient: LlmClient(
@@ -170,16 +261,19 @@ class _FakeAnnotationService extends AnnotationService {
       );
 
   final Future<EssayContent> essayFuture;
+  final Stream<AnnotationEvent<EssayContent>>? essayStream;
   int essayCalls = 0;
 
   @override
-  Future<EssayContent> getOrCreateEssay(
+  Stream<AnnotationEvent<EssayContent>> streamEssay(
     Poem poem, {
     bool forceRegenerate = false,
     String? personaId,
   }) {
     essayCalls++;
-    return essayFuture;
+    final scripted = essayStream;
+    if (scripted != null) return scripted;
+    return essayFuture.asStream().map(AnnotationDone<EssayContent>.new);
   }
 }
 

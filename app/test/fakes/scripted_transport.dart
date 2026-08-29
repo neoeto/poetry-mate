@@ -2,6 +2,7 @@
 /// (client 测试与设置页 widget 测试共用)
 
 library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -27,10 +28,23 @@ class ScriptedTransport implements LlmTransport {
 
   /// 非 null 时 postStream 抛此状态码错误(用于测试一次性降级)
   int? streamStatusError;
+
+  /// 按调用顺序让 postStream 抛出的状态码错误。
+  final List<int> streamStatusQueue = [];
   String errorBody = '{"error":{"message":"boom"}}';
 
-  /// postStream 吐出的 SSE 文本(按行)
+  /// 按调用顺序提供完整 SSE 文本(每次 postStream 消耗一项)。
+  final List<String> sseQueue = [];
+
+  /// postStream 吐出的 SSE 文本(按行)。未显式设置 SSE 时,若有 jsonResult
+  /// 会自动把其 message.content 包装成一个完整 SSE 响应,方便旧测试复用。
   String? sseText;
+
+  /// 将一次 SSE 响应拆成多个原始字节块吐出,用于测试跨块/跨帧场景。
+  List<String>? sseChunks;
+
+  /// 吐完流式块后抛出的错误,用于模拟中途断流。
+  Object? streamTailError;
 
   Uri? lastUrl;
   Map<String, String> lastHeaders = {};
@@ -68,10 +82,41 @@ class ScriptedTransport implements LlmTransport {
     lastHeaders = headers;
     lastBody = body;
     callCount++;
-    final status = streamStatusError ?? statusError;
+    final status = streamStatusQueue.isNotEmpty
+        ? streamStatusQueue.removeAt(0)
+        : streamStatusError ?? statusError;
     if (status != null) {
       throw statusToError(status, errorBody);
     }
-    yield Uint8List.fromList(utf8.encode(sseText ?? ''));
+
+    final scriptedText = sseQueue.isNotEmpty
+        ? sseQueue.removeAt(0)
+        : sseText ?? _sseFromJsonResult();
+    final chunks = sseChunks ?? [scriptedText];
+    for (final chunk in chunks) {
+      yield Uint8List.fromList(utf8.encode(chunk));
+    }
+    final error = streamTailError;
+    if (error != null) throw error;
+  }
+
+  String _sseFromJsonResult() {
+    final response = jsonResult;
+    if (response == null) return '';
+    final choices = response['choices'];
+    if (choices is! List || choices.isEmpty || choices.first is! Map) {
+      return '';
+    }
+    final message = (choices.first as Map)['message'];
+    final content = message is Map ? message['content'] : null;
+    if (content is! String) return '';
+    final frame = jsonEncode({
+      'choices': [
+        {
+          'delta': {'content': content},
+        },
+      ],
+    });
+    return 'data: $frame\n\ndata: [DONE]\n';
   }
 }

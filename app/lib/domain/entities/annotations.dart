@@ -42,6 +42,252 @@ Map<String, dynamic>? tryDecodeJsonObject(String raw) {
 }
 
 // ---------------------------------------------------------------------------
+// 流式部分 JSON 解析
+// ---------------------------------------------------------------------------
+
+/// 不完整 JSON 的字段级快照 —— 流式生成期间渐进渲染的依据。
+class PartialJsonSnapshot {
+  const PartialJsonSnapshot({
+    required this.closedValues,
+    required this.openArrayItems,
+    required this.openKeys,
+  });
+
+  /// 已完整闭合的顶层字段值
+  final Map<String, dynamic> closedValues;
+
+  /// 仍在生成中的数组: 已闭合元素的按序快照(未闭合的尾元素舍弃)
+  final Map<String, List<dynamic>> openArrayItems;
+
+  /// 已出现但尚未闭合的顶层字段
+  final Set<String> openKeys;
+
+  bool get isEmpty =>
+      closedValues.isEmpty && openArrayItems.isEmpty && openKeys.isEmpty;
+}
+
+/// 把不完整的 JSON 前缀修复为可解析快照 —— 流式渐进渲染专用。
+///
+/// 原则: 只产出**已完整闭合**的字段与数组元素，绝不产出半截字符串值
+/// (否则 UI 会闪现残缺文本)。自动容忍 ``` 围栏或说明文字前导。
+/// 输入连一个对象起始都没有时返回 null。
+PartialJsonSnapshot? tryDecodePartialJsonObject(String raw) {
+  final start = raw.indexOf('{');
+  if (start == -1) return null;
+  final scanner = _PartialJsonScanner(raw, start);
+  final value = scanner.parseValue();
+  if (value.value is! Map) return null;
+  return PartialJsonSnapshot(
+    closedValues: scanner.closedValues,
+    openArrayItems: scanner.openArrayItems,
+    openKeys: scanner.openKeys,
+  );
+}
+
+class _ScanValue {
+  const _ScanValue(this.value, this.complete);
+
+  final dynamic value;
+  final bool complete;
+
+  static const _ScanValue truncated = _ScanValue(null, false);
+}
+
+/// 单遍字符扫描器: 跟踪字符串/转义/括号深度，记录顶层字段的闭合状态。
+class _PartialJsonScanner {
+  _PartialJsonScanner(this.text, int start) : i = start;
+
+  final String text;
+  int i;
+
+  /// 嵌套深度: 1 = 根对象的直接字段(只有这一层才记录到顶层快照)
+  int _depth = 0;
+
+  final Map<String, dynamic> closedValues = {};
+  final Map<String, List<dynamic>> openArrayItems = {};
+  final Set<String> openKeys = {};
+
+  void _skipWs() {
+    while (i < text.length && _isWs(text.codeUnitAt(i))) {
+      i++;
+    }
+  }
+
+  static bool _isWs(int codeUnit) =>
+      codeUnit == 0x20 ||
+      codeUnit == 0x09 ||
+      codeUnit == 0x0a ||
+      codeUnit == 0x0d;
+
+  bool _peekChar(String char) => i < text.length && text[i] == char;
+
+  /// 解析一个值;对象/数组即便未闭合也返回已收集的内容(complete=false)。
+  _ScanValue parseValue() {
+    _skipWs();
+    if (i >= text.length) return _ScanValue.truncated;
+    final ch = text[i];
+    if (ch == '"') return _parseString();
+    if (ch == '{') return _parseObject();
+    if (ch == '[') return _parseArray();
+    return _parsePrimitive();
+  }
+
+  /// 字符串。截断时返回 complete=false 与已积累的部分(调用方丢弃)。
+  _ScanValue _parseString() {
+    i++; // 开引号
+    final buffer = StringBuffer();
+    while (i < text.length) {
+      final ch = text[i];
+      if (ch == '"') {
+        i++;
+        return _ScanValue(buffer.toString(), true);
+      }
+      if (ch == r'\') {
+        i++;
+        if (i >= text.length) return _ScanValue(buffer.toString(), false);
+        final esc = text[i];
+        switch (esc) {
+          case '"' || r'\' || '/':
+            buffer.write(esc);
+            i++;
+          case 'b':
+            buffer.write('\b');
+            i++;
+          case 'f':
+            buffer.write('\f');
+            i++;
+          case 'n':
+            buffer.write('\n');
+            i++;
+          case 'r':
+            buffer.write('\r');
+            i++;
+          case 't':
+            buffer.write('\t');
+            i++;
+          case 'u':
+            if (i + 5 > text.length) {
+              return _ScanValue(buffer.toString(), false);
+            }
+            final hex = text.substring(i + 1, i + 5);
+            final code = int.tryParse(hex, radix: 16);
+            if (code == null) return _ScanValue(buffer.toString(), false);
+            buffer.writeCharCode(code);
+            i += 5;
+          default:
+            // 非法转义 → 视为截断,等待下一帧重试
+            return _ScanValue(buffer.toString(), false);
+        }
+      } else {
+        buffer.write(ch);
+        i++;
+      }
+    }
+    return _ScanValue(buffer.toString(), false);
+  }
+
+  _ScanValue _parseObject() {
+    _depth++;
+    final local = <String, dynamic>{};
+    i++; // '{'
+    while (true) {
+      _skipWs();
+      if (i >= text.length) {
+        _depth--;
+        return _ScanValue(local, false);
+      }
+      if (_peekChar('}')) {
+        i++;
+        _depth--;
+        return _ScanValue(local, true);
+      }
+      if (_peekChar(',')) {
+        i++;
+        continue;
+      }
+      final key = _parseString();
+      if (!key.complete) {
+        _depth--;
+        return _ScanValue(local, false);
+      }
+      _skipWs();
+      final k = key.value as String;
+      if (!_peekChar(':')) {
+        if (_depth == 1) openKeys.add(k);
+        _depth--;
+        return _ScanValue(local, false);
+      }
+      i++;
+      final value = parseValue();
+      if (value.complete) {
+        local[k] = value.value;
+        if (_depth == 1) closedValues[k] = value.value;
+      } else {
+        // 数组截断时,已闭合元素仍有展示价值(仅根层字段)
+        if (_depth == 1) {
+          openKeys.add(k);
+          if (value.value is List) {
+            final items = value.value as List;
+            if (items.isNotEmpty) openArrayItems[k] = items;
+          }
+        }
+        _depth--;
+        return _ScanValue(local, false);
+      }
+    }
+  }
+
+  _ScanValue _parseArray() {
+    _depth++;
+    final items = <dynamic>[];
+    i++; // '['
+    while (true) {
+      _skipWs();
+      if (i >= text.length) {
+        _depth--;
+        return _ScanValue(items, false);
+      }
+      if (_peekChar(']')) {
+        i++;
+        _depth--;
+        return _ScanValue(items, true);
+      }
+      if (_peekChar(',')) {
+        i++;
+        continue;
+      }
+      final element = parseValue();
+      if (!element.complete) {
+        _depth--;
+        return _ScanValue(items, false);
+      }
+      items.add(element.value);
+    }
+  }
+
+  /// true/false/null/数字。只有遇到终止符(而不是 EOF)才算闭合——
+  /// 例如 `12` 可能是 `123` 的前缀。
+  _ScanValue _parsePrimitive() {
+    final start = i;
+    while (i < text.length) {
+      final cu = text.codeUnitAt(i);
+      if (_isWs(cu) || text[i] == ',' || text[i] == '}' || text[i] == ']') {
+        break;
+      }
+      i++;
+    }
+    if (i >= text.length) return _ScanValue.truncated; // EOF,可能是前缀
+    final literal = text.substring(start, i);
+    if (literal == 'true') return const _ScanValue(true, true);
+    if (literal == 'false') return const _ScanValue(false, true);
+    if (literal == 'null') return const _ScanValue(null, true);
+    final number = num.tryParse(literal);
+    if (number != null) return _ScanValue(number, true);
+    return _ScanValue.truncated;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // L1 逐句注
 // ---------------------------------------------------------------------------
 
@@ -264,6 +510,16 @@ class LineNoteContent {
     return LineNoteContent.fromJson(decoded);
   }
 
+  /// 流式部分快照 → 可渲染内容(未闭合字段留空,notes 仅取已闭合条目)
+  factory LineNoteContent.fromPartialSnapshot(PartialJsonSnapshot snapshot) {
+    return LineNoteContent.fromJson({
+      'translation': snapshot.closedValues['translation'] ?? '',
+      'notes': snapshot.closedValues['notes'] is List
+          ? snapshot.closedValues['notes']
+          : (snapshot.openArrayItems['notes'] ?? const <dynamic>[]),
+    });
+  }
+
   LineNoteContent copyWith({String? translation, List<KeywordNote>? notes}) =>
       LineNoteContent(
         translation: translation ?? this.translation,
@@ -375,6 +631,28 @@ class EssayContent {
     final decoded = tryDecodeJsonObject(raw);
     if (decoded == null) return null;
     return EssayContent.fromJson(decoded);
+  }
+
+  /// 流式部分快照 → 可渲染内容: 未闭合字段留空默认值,
+  /// 生成中的数组仅取已闭合元素。配合 [PartialJsonSnapshot.closedKeys]
+  /// 可区分"还没生成到"与"模型未提供"。
+  factory EssayContent.fromPartialSnapshot(PartialJsonSnapshot snapshot) {
+    dynamic listFor(String key) {
+      final closed = snapshot.closedValues[key];
+      if (closed is List) return closed;
+      return snapshot.openArrayItems[key] ?? const <dynamic>[];
+    }
+
+    final merged = <String, dynamic>{
+      'summary': snapshot.closedValues['summary'] ?? '',
+      'mood': snapshot.closedValues['mood'] ?? '',
+      'emotion': snapshot.closedValues['emotion'] ?? '',
+      'craft': listFor('craft'),
+      'word_notes': listFor('word_notes'),
+    };
+    final background = snapshot.closedValues['background'];
+    if (background is Map) merged['background'] = background;
+    return EssayContent.fromJson(merged);
   }
 
   EssayContent copyWith({

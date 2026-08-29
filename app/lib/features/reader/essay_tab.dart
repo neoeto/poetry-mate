@@ -4,6 +4,8 @@
 /// 具体缓存与重试由 AnnotationService 负责。
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,9 +33,17 @@ class EssayTab extends ConsumerStatefulWidget {
   ConsumerState<EssayTab> createState() => _EssayTabState();
 }
 
+enum _EssayPhase { loading, streaming, done, error }
+
 class _EssayTabState extends ConsumerState<EssayTab>
     with AutomaticKeepAliveClientMixin<EssayTab> {
-  late Future<EssayContent> _essayFuture;
+  StreamSubscription<AnnotationEvent<EssayContent>>? _subscription;
+  _EssayPhase _phase = _EssayPhase.loading;
+  EssayContent? _content;
+  Object? _error;
+  Set<String> _closedKeys = const {};
+  Set<String> _pendingKeys = const {};
+  var _generation = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -41,22 +51,92 @@ class _EssayTabState extends ConsumerState<EssayTab>
   @override
   void initState() {
     super.initState();
-    _essayFuture = _load();
+    _startStream();
   }
 
-  Future<EssayContent> _load({bool forceRegenerate = false}) async {
-    final essay = await ref
+  void _startStream({bool forceRegenerate = false}) {
+    final generation = ++_generation;
+    final oldSubscription = _subscription;
+    _subscription = null;
+    oldSubscription?.cancel();
+
+    void reset() {
+      _phase = _EssayPhase.loading;
+      _content = null;
+      _error = null;
+      _closedKeys = const {};
+      _pendingKeys = const {};
+    }
+
+    if (mounted) {
+      setState(reset);
+    } else {
+      reset();
+    }
+
+    final stream = ref
         .read(annotationServiceProvider)
-        .getOrCreateEssay(widget.poem, forceRegenerate: forceRegenerate);
-    if (mounted) widget.onContentReady?.call(essay);
-    return essay;
+        .streamEssay(widget.poem, forceRegenerate: forceRegenerate);
+    _subscription = stream.listen(
+      (event) {
+        if (!mounted || generation != _generation) return;
+        _handleEvent(event);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!mounted || generation != _generation) return;
+        setState(() {
+          _phase = _EssayPhase.error;
+          _error = error;
+        });
+      },
+      onDone: () {
+        if (!mounted || generation != _generation) return;
+        // 正常实现总会在 onDone 前发 AnnotationDone；这里仅防御异常实现。
+        if (_phase != _EssayPhase.done && _phase != _EssayPhase.error) {
+          setState(() {
+            _phase = _EssayPhase.error;
+            _error = const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
+          });
+        }
+      },
+    );
   }
 
-  void _retry() {
-    setState(() {
-      _essayFuture = _load();
-    });
+  void _handleEvent(AnnotationEvent<EssayContent> event) {
+    if (event is AnnotationReset) {
+      setState(() {
+        _phase = _EssayPhase.loading;
+        _content = null;
+        _closedKeys = const {};
+        _pendingKeys = const {};
+      });
+      return;
+    }
+    if (event is AnnotationPartial) {
+      final partialEvent = event as AnnotationPartial<dynamic>;
+      final partial = partialEvent.content as EssayContent;
+      setState(() {
+        _phase = _EssayPhase.streaming;
+        _content = partial;
+        _closedKeys = Set<String>.from(partialEvent.closedKeys);
+        _pendingKeys = Set<String>.from(partialEvent.pendingKeys);
+      });
+      return;
+    }
+    if (event is AnnotationDone) {
+      final doneEvent = event as AnnotationDone<dynamic>;
+      final content = doneEvent.content as EssayContent;
+      setState(() {
+        _phase = _EssayPhase.done;
+        _content = content;
+        _closedKeys = const {};
+        _pendingKeys = const {};
+      });
+      widget.onContentReady?.call(content);
+    }
   }
+
+  void _retry() => _startStream();
 
   Future<NotebookEntry?> _entry() {
     return ref
@@ -79,38 +159,43 @@ class _EssayTabState extends ConsumerState<EssayTab>
       userEdited: entry?.userEdited ?? false,
     );
     if (!confirmed || !mounted) return;
-    setState(() {
-      _essayFuture = _load(forceRegenerate: true);
-    });
+    _startStream(forceRegenerate: true);
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return FutureBuilder<EssayContent>(
-      future: _essayFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _EssaySkeleton();
-        }
-        if (snapshot.hasError) {
-          return _EssayError(
-            error: snapshot.error,
-            onRetry: _retry,
-            onOpenSettings: widget.onOpenSettings,
-          );
-        }
-        final essay = snapshot.data;
-        if (essay == null) {
-          return _EssayError(onRetry: _retry);
-        }
-        return EssayContentView(
-          content: essay,
-          onEdit: _edit,
-          onRegenerate: _regenerate,
-        );
-      },
-    );
+    return switch (_phase) {
+      _EssayPhase.loading => const _EssaySkeleton(),
+      _EssayPhase.streaming =>
+        _content == null
+            ? const _EssaySkeleton()
+            : _EssayStreamingView(
+                content: _content!,
+                closedKeys: _closedKeys,
+                pendingKeys: _pendingKeys,
+              ),
+      _EssayPhase.done =>
+        _content == null
+            ? _EssayError(onRetry: _retry)
+            : EssayContentView(
+                content: _content!,
+                onEdit: _edit,
+                onRegenerate: _regenerate,
+              ),
+      _EssayPhase.error => _EssayError(
+        error: _error,
+        onRetry: _retry,
+        onOpenSettings: widget.onOpenSettings,
+      ),
+    };
   }
 }
 
@@ -152,6 +237,136 @@ class _EssaySkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 赏析流式生成中的渐进视图：只渲染已闭合字段，未完成字段显示占位。
+class _EssayStreamingView extends StatelessWidget {
+  const _EssayStreamingView({
+    required this.content,
+    required this.closedKeys,
+    required this.pendingKeys,
+  });
+
+  final EssayContent content;
+  final Set<String> closedKeys;
+  final Set<String> pendingKeys;
+
+  bool _visible(String key) =>
+      closedKeys.contains(key) || pendingKeys.contains(key);
+
+  Widget _text(String key, String value) => closedKeys.contains(key)
+      ? _EssayText(value)
+      : const _GeneratingEssayText();
+
+  Widget _craft() {
+    final items = [
+      for (final item in content.craft)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (item.point.isNotEmpty) Text(item.point),
+              if (item.detail.isNotEmpty) ...[
+                if (item.point.isNotEmpty) const SizedBox(height: 4),
+                Text(item.detail),
+              ],
+            ],
+          ),
+        ),
+    ];
+    if (closedKeys.contains('craft')) {
+      return items.isEmpty ? const _EmptyEssayText() : Column(children: items);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [if (items.isNotEmpty) ...items, const _GeneratingEssayText()],
+    );
+  }
+
+  Widget _wordNotes() {
+    final items = [
+      for (final note in content.wordNotes)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            '${note.term}${note.pinyin.trim().isEmpty ? '' : '（${note.pinyin.trim()}）'}：${note.explain}',
+          ),
+        ),
+    ];
+    if (closedKeys.contains('word_notes')) {
+      return items.isEmpty
+          ? const SizedBox.shrink()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: items,
+            );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [if (items.isNotEmpty) ...items, const _GeneratingEssayText()],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
+      children: [
+        Row(
+          children: [
+            const Expanded(child: Text('正在生成赏析…')),
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (_visible('summary'))
+          _EssaySection(title: '大意', child: _text('summary', content.summary)),
+        if (_visible('craft')) _EssaySection(title: '炼字与手法', child: _craft()),
+        if (_visible('word_notes') || content.wordNotes.isNotEmpty)
+          _EssaySection(title: '词语解释', child: _wordNotes()),
+        if (_visible('mood'))
+          _EssaySection(title: '意境', child: _text('mood', content.mood)),
+        if (_visible('emotion'))
+          _EssaySection(title: '情感', child: _text('emotion', content.emotion)),
+        if (_visible('background'))
+          _EssaySection(
+            title: '创作背景',
+            child: closedKeys.contains('background')
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (content.background.uncertain)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8),
+                          child: Chip(
+                            avatar: Icon(Icons.info_outline, size: 16),
+                            label: Text('史料不详，仅供参考'),
+                          ),
+                        ),
+                      _EssayText(content.background.text),
+                    ],
+                  )
+                : const _GeneratingEssayText(),
+          ),
+      ],
+    );
+  }
+}
+
+class _GeneratingEssayText extends StatelessWidget {
+  const _GeneratingEssayText();
+
+  @override
+  Widget build(BuildContext context) =>
+      Text('生成中…', style: Theme.of(context).textTheme.bodySmall);
 }
 
 class EssayContentView extends StatelessWidget {

@@ -1,5 +1,7 @@
 // AnnotationService 测试(任务 3.2/3.3 引擎层):
 // 缓存命中 / userEdited 保护 / 强制重生成 / 围栏剥离 / 重试 / 失败不落库。
+import 'dart:convert';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -107,14 +109,10 @@ void main() {
 
     test('JSON mode 不被兼容服务支持时，第二次改用普通请求', () async {
       final poem = testPoem(paragraphs: ['床前看月光。']);
-      transport.jsonStatusQueue.add(400);
-      transport.jsonQueue.add({
-        'choices': [
-          {
-            'message': {'content': lineNoteJson},
-          },
-        ],
-      });
+      transport.sseQueue.addAll([
+        _sseForPieces(['不是 JSON']),
+        _sseForPieces([lineNoteJson]),
+      ]);
 
       final note = await service.getOrCreateLineNote(poem, 0);
 
@@ -409,13 +407,7 @@ void main() {
     test('markdown 围栏自动剥离', () async {
       final poem = testPoem(title: '围栏诗');
       final fenced = '```json\n$essayJson\n```';
-      transport.jsonQueue.add({
-        'choices': [
-          {
-            'message': {'content': fenced},
-          },
-        ],
-      });
+      transport.sseText = _sseForPieces([fenced]);
 
       final essay = await service.getOrCreateEssay(poem);
       expect(essay.mood, '静夜意境');
@@ -424,21 +416,9 @@ void main() {
 
     test('连续两次坏 JSON → badResponse 且注本无残留', () async {
       final poem = testPoem(title: '坏JSON诗');
-      transport.jsonQueue.addAll([
-        {
-          'choices': [
-            {
-              'message': {'content': '不是json'},
-            },
-          ],
-        },
-        {
-          'choices': [
-            {
-              'message': {'content': '还不是json'},
-            },
-          ],
-        },
+      transport.sseQueue.addAll([
+        _sseForPieces(['不是json']),
+        _sseForPieces(['还不是json']),
       ]);
 
       await expectLater(
@@ -450,6 +430,168 @@ void main() {
         ),
       );
 
+      expect(transport.callCount, 2);
+      expect(await notebookRepo.byPoem(poem.id), isEmpty);
+    });
+  });
+
+  group('L1 流式生成', () {
+    test('流式成功: 直译先出,关键词注逐条出现,最终才落库', () async {
+      final poem = testPoem(paragraphs: ['床前看月光。', '疑是地上霜。']);
+      transport.sseText = _sseForPieces([
+        '{"translation":"月光洒在床前","notes":',
+        '[{"term":"疑","explain":"好像"},',
+        '{"term":"霜","explain":"霜露"}]}',
+      ]);
+
+      final events = await service.streamLineNote(poem, 1).toList();
+      final partials = events.whereType<AnnotationPartial<LineNoteContent>>();
+      final done = events.whereType<AnnotationDone<LineNoteContent>>().single;
+
+      expect(partials, isNotEmpty);
+      expect(
+        partials.any(
+          (event) =>
+              event.closedKeys.contains('translation') &&
+              event.content.translation == '月光洒在床前',
+        ),
+        isTrue,
+      );
+      expect(partials.any((event) => event.content.notes.length == 1), isTrue);
+      expect(done.content.notes, hasLength(2));
+      final entry = await notebookRepo.byTarget(
+        poemId: poem.id,
+        kind: NotebookKind.lineNote,
+        target: '1',
+      );
+      expect(entry?.content['notes'], hasLength(2));
+    });
+
+    test('流式中断: 已有 partial 时用一次性结果替换并落库', () async {
+      final poem = testPoem(title: '断流诗');
+      transport.sseText = _sseForPieces([
+        '{"translation":"流式片段",',
+      ], includeDone: false);
+      transport.streamTailError = Exception('断流');
+      transport.jsonResult = {
+        'choices': [
+          {
+            'message': {'content': lineNoteJson},
+          },
+        ],
+      };
+
+      final events = await service.streamLineNote(poem, 0).toList();
+      final partial = events
+          .whereType<AnnotationPartial<LineNoteContent>>()
+          .single;
+      final done = events.whereType<AnnotationDone<LineNoteContent>>().single;
+
+      expect(partial.content.translation, '流式片段');
+      expect(done.content.translation, '月光洒在床前');
+      expect(transport.callCount, 2);
+    });
+  });
+
+  group('L2 整篇赏析', () {
+    test('流式成功: 先发 partial,完成后才落库完整结果', () async {
+      final poem = testPoem(title: '流式诗');
+      transport.sseText = _sseForPieces([
+        '{"summary":"游子思乡","craft":[{"point":"疑字","detail":"以幻写真"}],',
+        '"mood":"静夜意境",',
+        '"emotion":"思乡清愁","background":{"text":"相传","uncertain":true},',
+        '"word_notes":[{"term":"疑","explain":"好像","line_index":1},',
+        '{"term":"不存在","explain":"外部","line_index":0}]}',
+      ]);
+
+      final events = await service.streamEssay(poem).toList();
+      final partials = events
+          .whereType<AnnotationPartial<EssayContent>>()
+          .toList();
+      final done = events.whereType<AnnotationDone<EssayContent>>().single;
+
+      expect(partials, isNotEmpty);
+      expect(
+        partials.any((event) => event.closedKeys.contains('summary')),
+        isTrue,
+      );
+      expect(partials.any((event) => event.content.summary == '游子思乡'), isTrue);
+      expect(done.content.wordNotes, hasLength(1));
+      expect(done.content.wordNotes.single.term, '疑');
+      final entry = await notebookRepo.byTarget(
+        poemId: poem.id,
+        kind: NotebookKind.essay,
+      );
+      expect(entry, isNotNull);
+      expect(entry!.content['summary'], '游子思乡');
+      expect(entry.content['word_notes'], hasLength(1));
+    });
+
+    test('流式中断: 已有 partial 时用一次性结果替换并落库', () async {
+      final poem = testPoem(title: '断流诗');
+      transport.sseText = _sseForPieces([
+        '{"summary":"流式片段",',
+      ], includeDone: false);
+      transport.streamTailError = Exception('断流');
+      transport.jsonResult = {
+        'choices': [
+          {
+            'message': {'content': essayJson},
+          },
+        ],
+      };
+
+      final events = await service.streamEssay(poem).toList();
+      final partial = events
+          .whereType<AnnotationPartial<EssayContent>>()
+          .single;
+      final done = events.whereType<AnnotationDone<EssayContent>>().single;
+
+      expect(partial.content.summary, '流式片段');
+      expect(done.content.summary, '游子思乡');
+      expect(transport.callCount, 2);
+      expect(await notebookRepo.byPoem(poem.id), hasLength(1));
+    });
+
+    test('空流: 自动降级一次性补全', () async {
+      final poem = testPoem(title: '空流诗');
+      transport.sseText = '';
+      transport.jsonResult = {
+        'choices': [
+          {
+            'message': {'content': essayJson},
+          },
+        ],
+      };
+
+      final events = await service.streamEssay(poem).toList();
+
+      expect(events.whereType<AnnotationPartial<EssayContent>>(), isEmpty);
+      expect(
+        events.whereType<AnnotationDone<EssayContent>>().single.content.summary,
+        '游子思乡',
+      );
+      expect(transport.callCount, 2);
+    });
+
+    test('两轮流式 JSON 均失败: 抛原文格式异常且不落库', () async {
+      final poem = testPoem(title: '流式坏 JSON');
+      transport.sseQueue.addAll([
+        _sseForPieces(['不是json']),
+        _sseForPieces(['仍然不是json']),
+      ]);
+
+      final events = service.streamEssay(poem).toList();
+      await expectLater(
+        events,
+        throwsA(
+          isA<AnnotationParseException>().having(
+            (error) => error.rawText,
+            'rawText',
+            '仍然不是json',
+          ),
+        ),
+      );
       expect(transport.callCount, 2);
       expect(await notebookRepo.byPoem(poem.id), isEmpty);
     });
@@ -496,6 +638,21 @@ void main() {
       expect(entries.single.content['answer'], '这是一次性回答');
     });
   });
+}
+
+String _sseForPieces(List<String> pieces, {bool includeDone = true}) {
+  final frames = [
+    for (final piece in pieces)
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'delta': {'content': piece},
+          },
+        ],
+      })}',
+    if (includeDone) 'data: [DONE]',
+  ];
+  return '${frames.join('\n')}\n';
 }
 
 class _StaticSecure implements SecureKeyStore {

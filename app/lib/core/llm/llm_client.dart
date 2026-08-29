@@ -28,8 +28,8 @@ class LlmClient {
   LlmClient({
     required LlmConfigStore configStore,
     required LlmTransport transport,
-  })  : _configStore = configStore,
-        _transport = transport;
+  }) : _configStore = configStore,
+       _transport = transport;
 
   final LlmConfigStore _configStore;
   final LlmTransport _transport;
@@ -42,20 +42,23 @@ class LlmClient {
     int? maxTokens,
   }) async {
     final config = await _requireConfig();
-    final response = await _transport.postJson(_endpoint(config),
-        _headers(config), {
-      'model': config.model,
-      'messages': [for (final m in messages) m.toJson()],
-      'temperature': temperature,
-      'max_tokens': ?maxTokens,
-      if (jsonMode) 'response_format': {'type': 'json_object'},
-    });
+    final response = await _transport.postJson(
+      _endpoint(config),
+      _headers(config),
+      {
+        'model': config.model,
+        'messages': [for (final m in messages) m.toJson()],
+        'temperature': temperature,
+        'max_tokens': ?maxTokens,
+        if (jsonMode) 'response_format': {'type': 'json_object'},
+      },
+    );
 
     try {
       final choices = response['choices'] as List<dynamic>;
       final message = choices.first as Map<String, dynamic>;
-      final content = (message['message'] as Map<String, dynamic>)['content']
-          as String?;
+      final content =
+          (message['message'] as Map<String, dynamic>)['content'] as String?;
       if (content == null || content.isEmpty) {
         throw const LlmException(LlmErrorKind.badResponse, '返回内容为空');
       }
@@ -68,8 +71,11 @@ class LlmClient {
   }
 
   /// 流式对话: 逐段产出增量文本。
+  /// jsonMode=true 时同时声明 response_format=json_object
+  /// (SSE 与 json_object 可组合,供应商不支持时由上层重试路径兑底)。
   Stream<String> streamChat(
     List<LlmMessage> messages, {
+    bool jsonMode = false,
     double temperature = 0.7,
   }) async* {
     final config = await _requireConfig();
@@ -81,6 +87,7 @@ class LlmClient {
         'messages': [for (final m in messages) m.toJson()],
         'temperature': temperature,
         'stream': true,
+        if (jsonMode) 'response_format': {'type': 'json_object'},
       },
     );
     yield* extractSseContent(byteStream);
@@ -97,8 +104,7 @@ class LlmClient {
         : '$base/chat/completions';
     try {
       final uri = Uri.parse(value);
-      if ((uri.scheme != 'https' && uri.scheme != 'http') ||
-          uri.host.isEmpty) {
+      if ((uri.scheme != 'https' && uri.scheme != 'http') || uri.host.isEmpty) {
         throw const FormatException('必须是带域名的 http(s) 地址');
       }
       return uri;
@@ -111,14 +117,16 @@ class LlmClient {
   }
 
   Map<String, String> _headers(LlmConfig config) => {
-        'authorization': 'Bearer ${config.apiKey}',
-      };
+    'authorization': 'Bearer ${config.apiKey}',
+  };
 
   Future<LlmConfig> _requireConfig() async {
     final config = await _configStore.read();
     if (config == null) {
       throw const LlmException(
-          LlmErrorKind.noKey, '尚未配置 AI 模型，去「我的 → LLM 配置」看看');
+        LlmErrorKind.noKey,
+        '尚未配置 AI 模型，去「我的 → LLM 配置」看看',
+      );
     }
     return config;
   }
@@ -142,7 +150,8 @@ Stream<String> extractSseContent(Stream<List<int>> byteStream) async* {
       final choices = frame is Map ? frame['choices'] as List<dynamic>? : null;
       if (choices == null || choices.isEmpty) continue;
       final delta =
-          (choices.first as Map<dynamic, dynamic>)['delta'] as Map<dynamic, dynamic>?;
+          (choices.first as Map<dynamic, dynamic>)['delta']
+              as Map<dynamic, dynamic>?;
       final content = delta?['content'];
       if (content is String && content.isNotEmpty) yield content;
     } on FormatException {

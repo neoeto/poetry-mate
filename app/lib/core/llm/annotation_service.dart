@@ -33,6 +33,40 @@ class SelectedWordValidationException extends LlmException {
     : super(LlmErrorKind.badResponse, message);
 }
 
+/// 结构化赏析的流式事件。
+sealed class AnnotationEvent<T> {
+  const AnnotationEvent();
+}
+
+/// 新一轮解析重试开始,UI 应清空上一轮的 partial 快照。
+final class AnnotationReset<T> extends AnnotationEvent<T> {
+  const AnnotationReset();
+}
+
+/// 已闭合字段的类型化快照。
+final class AnnotationPartial<T> extends AnnotationEvent<T> {
+  const AnnotationPartial(
+    this.content, {
+    required this.closedKeys,
+    this.pendingKeys = const {},
+  });
+
+  final T content;
+
+  /// 已完整闭合、可按最终语义展示的顶层字段。
+  final Set<String> closedKeys;
+
+  /// 已开始但尚未闭合的顶层字段,用于显示"生成中"占位。
+  final Set<String> pendingKeys;
+}
+
+/// 完整解析、护栏校验并写入注本后的终态事件。
+final class AnnotationDone<T> extends AnnotationEvent<T> {
+  const AnnotationDone(this.content);
+
+  final T content;
+}
+
 class AnnotationService {
   AnnotationService({
     required NotebookRepository notebookRepository,
@@ -46,13 +80,16 @@ class AnnotationService {
   final LlmClient _llm;
   final PersonaService _persona;
 
-  /// L1 点句即释
-  Future<LineNoteContent> getOrCreateLineNote(
+  /// L1 点句即释的流式入口。
+  ///
+  /// 缓存命中时只发出一个 [AnnotationDone]；首次生成时先发 partial 快照，
+  /// 完整结果经校验并写入注本后再发 [AnnotationDone]。
+  Stream<AnnotationEvent<LineNoteContent>> streamLineNote(
     Poem poem,
     int lineIndex, {
     bool forceRegenerate = false,
     String? personaId,
-  }) async {
+  }) async* {
     final target = lineIndex.toString();
     final existing = await _notebook.byTarget(
       poemId: poem.id,
@@ -60,12 +97,11 @@ class AnnotationService {
       target: target,
     );
     if (existing != null && !forceRegenerate) {
-      return LineNoteContent.tryParse(jsonEncode(existing.content)) ??
+      final cached =
+          LineNoteContent.tryParse(jsonEncode(existing.content)) ??
           LineNoteContent.fromJson(existing.content);
-    }
-
-    if (existing != null && existing.userEdited && !forceRegenerate) {
-      return LineNoteContent.fromJson(existing.content);
+      yield AnnotationDone(cached);
+      return;
     }
 
     final personaIdResolved = personaId ?? await _persona.selectedId();
@@ -75,7 +111,13 @@ class AnnotationService {
       metaLine: '${poem.author} · ${poem.dynasty}',
     );
     final line = poem.paragraphs[lineIndex];
-    final parsed = await _completeAndParse<LineNoteContent>(
+    final id = notebookEntryId(
+      poemId: poem.id,
+      kind: NotebookKind.lineNote,
+      target: target,
+    );
+
+    yield* _streamStructured<LineNoteContent>(
       systemPrompt: systemPrompt,
       userPrompt:
           '【诗】${poem.bodyText}\n\n请针对第 ${lineIndex + 1} 行「$line」：\n'
@@ -83,36 +125,48 @@ class AnnotationService {
           '每项 {term, pinyin, explain})。pinyin 使用结合语境的标准汉语拼音并带声调符号，'
           '词语内部用空格分隔。term 必须逐字出现在该句原文中。只输出 JSON 对象。',
       parse: LineNoteContent.tryParse,
+      buildPartial: LineNoteContent.fromPartialSnapshot,
+      finalize: (content) => content,
+      persist: (content) async {
+        final now = DateTime.now();
+        await _notebook.upsert(
+          NotebookEntry(
+            id: id,
+            poemId: poem.id,
+            kind: NotebookKind.lineNote,
+            target: target,
+            content: content.toJson(),
+            persona: personaIdResolved,
+            userEdited: false,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      },
     );
-
-    final id = notebookEntryId(
-      poemId: poem.id,
-      kind: NotebookKind.lineNote,
-      target: target,
-    );
-    final now = DateTime.now();
-    await _notebook.upsert(
-      NotebookEntry(
-        id: id,
-        poemId: poem.id,
-        kind: NotebookKind.lineNote,
-        target: target,
-        content: parsed.toJson(),
-        persona: personaIdResolved,
-        userEdited: false,
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
-    return parsed;
   }
 
-  /// L2 整篇结构化赏析
-  Future<EssayContent> getOrCreateEssay(
+  /// L1 非流式兼容包装：收集流直到终态事件。
+  Future<LineNoteContent> getOrCreateLineNote(
+    Poem poem,
+    int lineIndex, {
+    bool forceRegenerate = false,
+    String? personaId,
+  }) => _collectAnnotation(
+    streamLineNote(
+      poem,
+      lineIndex,
+      forceRegenerate: forceRegenerate,
+      personaId: personaId,
+    ),
+  );
+
+  /// L2 整篇结构化赏析的流式入口。
+  Stream<AnnotationEvent<EssayContent>> streamEssay(
     Poem poem, {
     bool forceRegenerate = false,
     String? personaId,
-  }) async {
+  }) async* {
     final existing = await _notebook.byTarget(
       poemId: poem.id,
       kind: NotebookKind.essay,
@@ -122,16 +176,10 @@ class AnnotationService {
       final cached =
           EssayContent.tryParse(jsonEncode(existing.content)) ??
           EssayContent.fromJson(existing.content);
-      return cached.copyWith(
-        wordNotes: _validWordNotes(poem, cached.wordNotes),
+      yield AnnotationDone(
+        cached.copyWith(wordNotes: _validWordNotes(poem, cached.wordNotes)),
       );
-    }
-
-    if (existing != null && existing.userEdited && !forceRegenerate) {
-      final cached = EssayContent.fromJson(existing.content);
-      return cached.copyWith(
-        wordNotes: _validWordNotes(poem, cached.wordNotes),
-      );
+      return;
     }
 
     final personaIdResolved = personaId ?? await _persona.selectedId();
@@ -140,8 +188,9 @@ class AnnotationService {
       poemBody: poem.bodyText,
       metaLine: '${poem.author} · ${poem.dynasty}',
     );
+    final id = notebookEntryId(poemId: poem.id, kind: NotebookKind.essay);
 
-    final rawParsed = await _completeAndParse<EssayContent>(
+    yield* _streamStructured<EssayContent>(
       systemPrompt: systemPrompt,
       userPrompt:
           '【诗】${poem.author}《${poem.displayTitle}》\n'
@@ -159,29 +208,41 @@ class AnnotationService {
           'line_index 为从 0 开始的正文行号，无法定位时可省略。没有可靠词语时返回空数组。\n'
           '背景与典故无把握时 text 留空且 uncertain=true。',
       parse: EssayContent.tryParse,
+      buildPartial: (snapshot) {
+        final partial = EssayContent.fromPartialSnapshot(snapshot);
+        return partial.copyWith(
+          wordNotes: _validWordNotes(poem, partial.wordNotes),
+        );
+      },
+      finalize: (content) =>
+          content.copyWith(wordNotes: _validWordNotes(poem, content.wordNotes)),
+      persist: (content) async {
+        final now = DateTime.now();
+        await _notebook.upsert(
+          NotebookEntry(
+            id: id,
+            poemId: poem.id,
+            kind: NotebookKind.essay,
+            target: null,
+            content: content.toJson(),
+            persona: personaIdResolved,
+            userEdited: false,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+      },
     );
-    // 第二层护栏：即使模型返回了诗文外的词，也不把它变成可点击标记。
-    final parsed = rawParsed.copyWith(
-      wordNotes: _validWordNotes(poem, rawParsed.wordNotes),
-    );
-
-    final id = notebookEntryId(poemId: poem.id, kind: NotebookKind.essay);
-    final now = DateTime.now();
-    await _notebook.upsert(
-      NotebookEntry(
-        id: id,
-        poemId: poem.id,
-        kind: NotebookKind.essay,
-        target: null,
-        content: parsed.toJson(),
-        persona: personaIdResolved,
-        userEdited: false,
-        createdAt: now,
-        updatedAt: now,
-      ),
-    );
-    return parsed;
   }
+
+  /// L2 非流式兼容包装：收集流直到终态事件。
+  Future<EssayContent> getOrCreateEssay(
+    Poem poem, {
+    bool forceRegenerate = false,
+    String? personaId,
+  }) => _collectAnnotation(
+    streamEssay(poem, forceRegenerate: forceRegenerate, personaId: personaId),
+  );
 
   /// 用户在正文中选择词语后的解释。
   ///
@@ -480,6 +541,132 @@ class AnnotationService {
     );
     if (entry == null) return null;
     return EssayContent.tryParse(jsonEncode(entry.content));
+  }
+
+  /// 结构化结果的流式生成器: 两轮流式优先,每轮传输失败时回退一次性补全。
+  Stream<AnnotationEvent<T>> _streamStructured<T>({
+    required String systemPrompt,
+    required String userPrompt,
+    required T? Function(String raw) parse,
+    required T Function(PartialJsonSnapshot snapshot) buildPartial,
+    required T Function(T content) finalize,
+    required Future<void> Function(T content) persist,
+  }) async* {
+    String? lastRaw;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) yield AnnotationReset<T>();
+
+      final messages = <LlmMessage>[
+        LlmMessage('system', systemPrompt),
+        LlmMessage('user', userPrompt),
+      ];
+      if (attempt == 1) {
+        messages.addAll([
+          const LlmMessage('assistant', '(上次输出无法解析为 JSON)'),
+          const LlmMessage(
+            'user',
+            '上一次输出不是合法 JSON。请重新回答，只输出一个合法 JSON 对象，不要任何其他文字。',
+          ),
+        ]);
+      }
+
+      final buffer = StringBuffer();
+      var streamFailed = false;
+      var lastSignature = '';
+
+      try {
+        await for (final chunk in _llm.streamChat(
+          messages,
+          jsonMode: attempt == 0,
+        )) {
+          if (chunk.isEmpty) continue;
+          buffer.write(chunk);
+          final snapshot = tryDecodePartialJsonObject(buffer.toString());
+          if (snapshot == null || snapshot.isEmpty) continue;
+
+          final signature = _partialSignature(snapshot);
+          if (signature == lastSignature) continue;
+          lastSignature = signature;
+          yield AnnotationPartial<T>(
+            buildPartial(snapshot),
+            closedKeys: Set.unmodifiable(snapshot.closedValues.keys.toSet()),
+            pendingKeys: Set.unmodifiable(snapshot.openKeys.toSet()),
+          );
+        }
+      } on LlmException catch (error) {
+        if (error.kind == LlmErrorKind.noKey) rethrow;
+        streamFailed = true;
+      } catch (_) {
+        // 兼容少数 transport 抛出的非 LlmException 网络错误。
+        streamFailed = true;
+      }
+
+      String raw;
+      if (streamFailed || buffer.isEmpty) {
+        try {
+          raw = await _llm.complete(messages, jsonMode: attempt == 0);
+        } on LlmException catch (error) {
+          if (error.kind != LlmErrorKind.badResponse) rethrow;
+          if (attempt == 1 && lastRaw != null) {
+            throw AnnotationParseException(lastRaw);
+          }
+          if (attempt == 1) rethrow;
+          continue;
+        }
+      } else {
+        raw = buffer.toString();
+      }
+
+      lastRaw = raw;
+      final parsed = parse(raw);
+      if (parsed != null) {
+        final content = finalize(parsed);
+        await persist(content);
+        yield AnnotationDone<T>(content);
+        return;
+      }
+
+      if (attempt == 1) {
+        if (raw.trim().isNotEmpty) {
+          throw AnnotationParseException(raw);
+        }
+        throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
+      }
+    }
+
+    final raw = lastRaw;
+    if (raw != null && raw.trim().isNotEmpty) {
+      throw AnnotationParseException(raw);
+    }
+    throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
+  }
+
+  /// 只有完整字段/数组元素出现时才重新通知 UI,避免每个 token 都重建页面。
+  String _partialSignature(PartialJsonSnapshot snapshot) {
+    final closed = snapshot.closedValues.keys.toList()..sort();
+    final pending = snapshot.openKeys.toList()..sort();
+    final arrays =
+        snapshot.openArrayItems.entries
+            .map((entry) => '${entry.key}:${entry.value.length}')
+            .toList()
+          ..sort();
+    return '${closed.join(',')}|${pending.join(',')}|${arrays.join(',')}';
+  }
+
+  Future<T> _collectAnnotation<T>(Stream<AnnotationEvent<T>> events) async {
+    late T content;
+    var completed = false;
+    await for (final event in events) {
+      if (event is AnnotationDone<T>) {
+        content = event.content;
+        completed = true;
+      }
+    }
+    if (!completed) {
+      throw const LlmException(LlmErrorKind.badResponse, '赏析返回格式异常');
+    }
+    return content;
   }
 
   /// 解析失败自动重试一次(附格式纠正提示)。

@@ -1,4 +1,5 @@
 // L1 点句即释 widget 测试：点击生成、缓存命中、无 Key 引导。
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,11 +10,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poetry_mate/core/llm/annotation_service.dart';
 import 'package:poetry_mate/core/llm/llm_client.dart';
 import 'package:poetry_mate/core/llm/llm_config.dart';
+import 'package:poetry_mate/core/llm/llm_transport.dart';
 import 'package:poetry_mate/core/llm/persona.dart';
 import 'package:poetry_mate/core/llm/secure_key_store.dart';
 import 'package:poetry_mate/data/preferences/reading_prefs.dart';
 import 'package:poetry_mate/data/providers.dart';
 import 'package:poetry_mate/data/repositories/notebook_repository.dart';
+import 'package:poetry_mate/domain/entities/annotations.dart';
 import 'package:poetry_mate/domain/entities/notebook_entry.dart';
 import 'package:poetry_mate/domain/entities/poem.dart';
 import 'package:poetry_mate/features/reader/reader_page.dart';
@@ -65,6 +68,7 @@ void main() {
     WidgetTester tester,
     Poem poem, {
     AnnotationService? annotationService,
+    bool settle = true,
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -80,7 +84,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
   }
 
   testWidgets('点击诗句生成直译与关键词注', (tester) async {
@@ -254,21 +258,9 @@ void main() {
   });
 
   testWidgets('结构化解析失败后展示模型原文降级态', (tester) async {
-    transport.jsonQueue.addAll([
-      {
-        'choices': [
-          {
-            'message': {'content': '第一份非 JSON'},
-          },
-        ],
-      },
-      {
-        'choices': [
-          {
-            'message': {'content': '第二份非 JSON'},
-          },
-        ],
-      },
+    transport.sseQueue.addAll([
+      _sseForPieces(['第一份非 JSON']),
+      _sseForPieces(['第二份非 JSON']),
     ]);
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);
@@ -295,6 +287,85 @@ void main() {
     expect(find.textContaining('boom'), findsOneWidget);
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('流式生成时直译先出,关键词注逐条出现', (tester) async {
+    final controller = StreamController<AnnotationEvent<LineNoteContent>>();
+    final service = _FakeLineStreamingService(controller.stream);
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem, annotationService: service, settle: false);
+
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('正在为这一句寻找合适的说法…'), findsOneWidget);
+
+    controller.add(
+      const AnnotationPartial<LineNoteContent>(
+        LineNoteContent(translation: '先到的直译', notes: []),
+        closedKeys: {'translation'},
+        pendingKeys: {'notes'},
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('白话'), findsOneWidget);
+    expect(find.text('先到的直译'), findsOneWidget);
+    expect(find.text('关键词注'), findsOneWidget);
+    expect(find.text('生成中…'), findsOneWidget);
+    expect(find.text('编辑注本'), findsNothing);
+
+    controller.add(
+      const AnnotationPartial<LineNoteContent>(
+        LineNoteContent(
+          translation: '先到的直译',
+          notes: [KeywordNote(term: '疑', explain: '好像', pinyin: 'yí')],
+        ),
+        closedKeys: {'translation'},
+        pendingKeys: {'notes'},
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.textContaining('疑（yí）：好像'), findsOneWidget);
+
+    controller.add(
+      const AnnotationDone<LineNoteContent>(
+        LineNoteContent(
+          translation: '最终直译',
+          notes: [KeywordNote(term: '疑', explain: '好像', pinyin: 'yí')],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('最终直译'), findsOneWidget);
+    expect(find.text('重新生成'), findsOneWidget);
+
+    await controller.close();
+    await tester.tap(find.byTooltip('关闭'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('关闭逐句注浮层时取消流式订阅', (tester) async {
+    var cancelled = false;
+    final controller = StreamController<AnnotationEvent<LineNoteContent>>(
+      onCancel: () {
+        cancelled = true;
+      },
+    );
+    final service = _FakeLineStreamingService(controller.stream);
+    final poem = testPoem(paragraphs: ['床前明月光，']);
+    await pumpReader(tester, poem, annotationService: service, settle: false);
+
+    await tester.tap(find.text('床前明月光，'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(cancelled, isTrue);
   });
 
   testWidgets('无 Key 时展示引导态而非错误堆栈', (tester) async {
@@ -325,6 +396,77 @@ void main() {
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
   });
+}
+
+String _sseForPieces(List<String> pieces) {
+  final frames = [
+    for (final piece in pieces)
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'delta': {'content': piece},
+          },
+        ],
+      })}',
+    'data: [DONE]',
+  ];
+  return '${frames.join('\n')}\n';
+}
+
+class _FakeLineStreamingService extends AnnotationService {
+  _FakeLineStreamingService(this.lineStream)
+    : super(
+        notebookRepository: _MemoryNotebookRepository(),
+        llmClient: LlmClient(
+          configStore: _NoopConfigStore(),
+          transport: _NoopTransport(),
+        ),
+        personaService: PersonaService(
+          assets: _TestAssetBundle(),
+          prefs: InMemoryPrefsStore(),
+        ),
+      );
+
+  final Stream<AnnotationEvent<LineNoteContent>> lineStream;
+  var lineCalls = 0;
+
+  @override
+  Stream<AnnotationEvent<LineNoteContent>> streamLineNote(
+    Poem poem,
+    int lineIndex, {
+    bool forceRegenerate = false,
+    String? personaId,
+  }) {
+    lineCalls++;
+    return lineStream;
+  }
+}
+
+class _NoopConfigStore implements LlmConfigStore {
+  @override
+  Future<LlmConfig?> read() async => null;
+
+  @override
+  Future<void> write(LlmConfig config) async {}
+
+  @override
+  Future<void> clear() async {}
+}
+
+class _NoopTransport implements LlmTransport {
+  @override
+  Future<Map<String, dynamic>> postJson(
+    Uri url,
+    Map<String, String> headers,
+    Map<String, dynamic> body,
+  ) async => {};
+
+  @override
+  Stream<List<int>> postStream(
+    Uri url,
+    Map<String, String> headers,
+    Map<String, dynamic> body,
+  ) async* {}
 }
 
 class _TestAssetBundle extends AssetBundle {
