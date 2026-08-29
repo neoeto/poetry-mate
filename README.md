@@ -64,6 +64,8 @@ cd server && npm install && npm run dev
 
 GitHub Actions 的 Android release 构建必须使用固定的 release keystore；未配置签名密钥时流水线会直接失败，禁止生成无法持续更新的 debug 签名包。
 
+完整的生成、Secrets 配置和签名排查步骤见 [`docs/android-signing.md`](docs/android-signing.md)。
+
 在仓库 Settings → Secrets and variables → Actions 中配置：
 
 - `ANDROID_KEYSTORE_BASE64`：keystore 文件的 base64 内容
