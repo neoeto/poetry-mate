@@ -9,6 +9,7 @@ import '../../core/llm/llm_exception.dart';
 import '../../core/llm/poem_finder_service.dart';
 import '../../data/providers.dart';
 import '../../domain/entities/extended_poem.dart';
+import '../../domain/entities/poem.dart';
 import '../../data/repositories/poem_catalog_repository.dart';
 
 class AiPoemFinderPage extends ConsumerStatefulWidget {
@@ -341,7 +342,7 @@ class _CandidateCard extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             Text(
-              candidate.paragraphs.join('\n'),
+              candidate.paragraphs.map(poemLineWithIndent).join('\n'),
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodyMedium,

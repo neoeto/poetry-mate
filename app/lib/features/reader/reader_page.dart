@@ -313,10 +313,7 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
           // ── 序文(v1 按正文样式呈现) ──
           if (widget.poem.preface != null)
             Padding(
-              padding: EdgeInsets.only(
-                left: widget.bodyStyle.fontSize ?? 24,
-                bottom: 12,
-              ),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 widget.renderLine(widget.poem.preface!),
                 style: widget.bodyStyle,
@@ -411,7 +408,8 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
     }
 
     final displayedLines = [
-      for (final line in widget.poem.paragraphs) widget.renderLine(line),
+      for (final line in widget.poem.paragraphs)
+        poemLineWithIndent(widget.renderLine(line)),
     ];
     var offset = 0;
     int? startLine;
@@ -476,11 +474,11 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
     required int start,
     required int end,
   }) {
-    if (original == displayed) {
-      return _OriginalRange(start, end);
-    }
-
-    final displayedToOriginal = <int>[];
+    final displayedToOriginal = List<int>.filled(
+      kPoemLineIndent.length,
+      -1,
+      growable: true,
+    );
     for (var index = 0; index < original.length; index++) {
       final rendered = widget.renderLine(original.substring(index, index + 1));
       for (var count = 0; count < rendered.length; count++) {
@@ -494,6 +492,7 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
     }
     final originalStart = displayedToOriginal[start];
     final originalEnd = displayedToOriginal[end - 1] + 1;
+    if (originalStart < 0 || originalEnd <= 0) return null;
     if (originalEnd > original.length ||
         widget.renderLine(original.substring(originalStart, originalEnd)) !=
             displayed.substring(start, end)) {
@@ -630,12 +629,18 @@ class _PoemLineState extends State<_PoemLine> {
       button: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
-        child: _indentedLine(
-          Text.rich(
-            TextSpan(style: widget.style, children: spans),
+        child: SizedBox(
+          width: double.infinity,
+          child: Text.rich(
+            TextSpan(
+              style: widget.style,
+              children: [
+                const TextSpan(text: kPoemLineIndent),
+                ...spans,
+              ],
+            ),
             textAlign: TextAlign.left,
           ),
-          matches,
         ),
       ),
     );
@@ -651,43 +656,16 @@ class _PoemLineState extends State<_PoemLine> {
           onTap: widget.onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
-            child: _indentedLine(
-              Text(
-                widget.renderLine(widget.originalText),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                poemLineWithIndent(widget.renderLine(widget.originalText)),
                 style: widget.style,
                 textAlign: TextAlign.left,
               ),
-              const [],
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _indentedLine(Widget text, List<_WordMatch> matches) {
-    final indent = widget.style.fontSize ?? 24;
-    return SizedBox(
-      width: double.infinity,
-      child: Stack(
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: indent),
-            child: SizedBox(width: double.infinity, child: text),
-          ),
-          if (matches.isNotEmpty)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: indent,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => widget.onWordTap(matches.first.note),
-                child: const SizedBox.expand(),
-              ),
-            ),
-        ],
       ),
     );
   }

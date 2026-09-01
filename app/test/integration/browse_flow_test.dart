@@ -111,7 +111,7 @@ void main() {
     await tester.tap(find.text('静夜思').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('床前明月光。'), findsOneWidget);
+    expect(find.text('　床前明月光。'), findsOneWidget);
   });
 
   testWidgets('空库启动: 分类页显示空态而非崩溃', (tester) async {

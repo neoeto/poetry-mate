@@ -76,7 +76,7 @@ void main() {
   testWidgets('无 Key 仍可阅读、收藏、白文和字号调整', (tester) async {
     await pumpPage(tester);
 
-    expect(find.text('床前明月光，'), findsOneWidget);
+    expect(find.text('　床前明月光，'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     await tester.pumpAndSettle();
@@ -86,8 +86,8 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.text_format_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('床前明月光'), findsOneWidget);
-    expect(find.text('床前明月光，'), findsNothing);
+    expect(find.text('　床前明月光'), findsOneWidget);
+    expect(find.text('　床前明月光，'), findsNothing);
 
     final container = ProviderScope.containerOf(
       tester.element(find.byType(PoemRoutePage)),
@@ -95,7 +95,7 @@ void main() {
     await container.read(readingSettingsProvider.notifier).setFontSize(28);
     await tester.pumpAndSettle();
     expect(
-      tester.widget<Text>(find.text('床前明月光')).style?.fontSize,
+      tester.widget<Text>(find.text('　床前明月光')).style?.fontSize,
       28,
     );
   });
@@ -103,7 +103,7 @@ void main() {
   testWidgets('L1/L2/L3 无 Key 均为配置引导态', (tester) async {
     await pumpPage(tester);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
     expect(find.text('还没有配置 AI'), findsOneWidget);
     await tester.tap(find.byTooltip('关闭'));
@@ -150,4 +150,3 @@ class _NoopTransport implements LlmTransport {
     Map<String, dynamic> body,
   ) async* {}
 }
-

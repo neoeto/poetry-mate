@@ -8,6 +8,13 @@ library;
 
 import 'dart:convert';
 
+/// 正文数组元素的单字缩进。使用全角空格，保证它属于诗句文本本身，
+/// 而不是依赖阅读页面的布局偏移。
+const kPoemLineIndent = '\u3000';
+
+String poemLineWithIndent(String line) =>
+    line.startsWith(kPoemLineIndent) ? line : '$kPoemLineIndent$line';
+
 class Poem {
   final String id;
   final String author;

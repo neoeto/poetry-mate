@@ -80,22 +80,22 @@ void main() {
     await seedAndPump(tester);
 
     // 默认带标点
-    expect(find.text('床前明月光，'), findsOneWidget);
+    expect(find.text('　床前明月光，'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.text_format_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('床前明月光'), findsOneWidget); // 无逗号
+    expect(find.text('　床前明月光'), findsOneWidget); // 无逗号
 
     await tester.tap(find.byIcon(Icons.text_format_outlined));
     await tester.pumpAndSettle();
-    expect(find.text('床前明月光，'), findsOneWidget);
+    expect(find.text('　床前明月光，'), findsOneWidget);
   });
 
   testWidgets('字号偏好生效: 预设28 → 正文28sp', (tester) async {
     await seedAndPump(tester, fontSize: 28);
 
     final style = tester
-        .widget<Text>(find.text('床前明月光，'))
+        .widget<Text>(find.text('　床前明月光，'))
         .style!;
     expect(style.fontSize, 28);
   });

@@ -36,10 +36,12 @@ void main() {
     await pumpReader(tester, poem);
 
     for (final line in poem.paragraphs) {
-      expect(find.text(line), findsOneWidget, reason: '缺行: $line');
+      expect(find.text('　$line'), findsOneWidget, reason: '缺行: $line');
     }
     // 左对齐
-    final firstLine = tester.widget<Text>(find.text(poem.paragraphs.first));
+    final firstLine = tester.widget<Text>(
+      find.text('　${poem.paragraphs.first}'),
+    );
     expect(firstLine.textAlign, TextAlign.left);
   });
 
@@ -57,7 +59,7 @@ void main() {
     await pumpReader(tester, poem);
 
     for (final line in poem.paragraphs) {
-      expect(find.text(line), findsOneWidget);
+      expect(find.text('　$line'), findsOneWidget);
     }
     // 词无题 → 词牌作为展示标题
     expect(find.text('水调歌头'), findsOneWidget);
@@ -67,7 +69,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光。']);
     await pumpReader(tester, poem);
 
-    final style = tester.widget<Text>(find.text('床前明月光。')).style!;
+    final style = tester.widget<Text>(find.text('　床前明月光。')).style!;
     expect(style.fontFamily, PoetryFonts.content);
     expect(style.fontSize, greaterThanOrEqualTo(22));
     expect(style.height, greaterThanOrEqualTo(1.9));

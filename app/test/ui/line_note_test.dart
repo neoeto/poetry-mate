@@ -91,7 +91,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
 
     expect(find.text('逐句即释 · 第 1 句'), findsOneWidget);
@@ -109,7 +109,7 @@ void main() {
     final poem = testPoem(paragraphs: ['疑是地上霜。']);
     await pumpReader(tester, poem);
 
-    await tester.tap(find.text('疑是地上霜。'));
+    await tester.tap(find.text('　疑是地上霜。'));
     await tester.pumpAndSettle();
     expect(find.textContaining('疑（yí）：好像'), findsOneWidget);
 
@@ -123,7 +123,7 @@ void main() {
     );
     final box = paragraph
         .getBoxesForSelection(
-          const TextSelection(baseOffset: 0, extentOffset: 1),
+          const TextSelection(baseOffset: 1, extentOffset: 2),
         )
         .single
         .toRect();
@@ -168,7 +168,7 @@ void main() {
     );
     final box = paragraph
         .getBoxesForSelection(
-          const TextSelection(baseOffset: 0, extentOffset: 1),
+          const TextSelection(baseOffset: 1, extentOffset: 2),
         )
         .single
         .toRect();
@@ -184,12 +184,12 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('关闭'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -219,7 +219,7 @@ void main() {
       ),
     );
     final localPosition = paragraph.getOffsetForCaret(
-      const TextPosition(offset: 1),
+      const TextPosition(offset: 2),
       Rect.zero,
     );
     await tester.longPressAt(paragraph.localToGlobal(localPosition));
@@ -245,7 +245,7 @@ void main() {
     );
     final markedBox = markedParagraph
         .getBoxesForSelection(
-          const TextSelection(baseOffset: 1, extentOffset: 2),
+          const TextSelection(baseOffset: 2, extentOffset: 3),
         )
         .single
         .toRect();
@@ -265,7 +265,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
 
     expect(find.text('结构化解析失败，先展示模型原文'), findsOneWidget);
@@ -280,7 +280,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
 
     expect(find.text('密钥无效'), findsOneWidget);
@@ -295,7 +295,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem, annotationService: service, settle: false);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('正在为这一句寻找合适的说法…'), findsOneWidget);
@@ -359,7 +359,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem, annotationService: service, settle: false);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpWidget(const SizedBox.shrink());
@@ -387,7 +387,7 @@ void main() {
     final poem = testPoem(paragraphs: ['床前明月光，']);
     await pumpReader(tester, poem, annotationService: noKeyService);
 
-    await tester.tap(find.text('床前明月光，'));
+    await tester.tap(find.text('　床前明月光，'));
     await tester.pumpAndSettle();
 
     expect(find.text('还没有配置 AI'), findsOneWidget);
