@@ -87,14 +87,10 @@ class ExtendedPoemDraft {
     final title = _stringOrNull(json['title'] ?? json['name']);
     final genre = _stringOrNull(json['genre'] ?? json['type']);
     final rawParagraphs = json['paragraphs'] ?? json['lines'] ?? json['body'];
-    if (title == null || genre == null || rawParagraphs is! List) return null;
+    if (title == null || genre == null) return null;
 
-    final paragraphs = <String>[];
-    for (final item in rawParagraphs) {
-      if (item is! String || item.trim().isEmpty) return null;
-      paragraphs.add(item.trim());
-    }
-    if (paragraphs.isEmpty) return null;
+    final paragraphs = _parseParagraphs(rawParagraphs);
+    if (paragraphs == null || paragraphs.isEmpty) return null;
 
     final rawConfidence = _stringOrNull(json['source_confidence']);
     final sourceConfidence =
@@ -145,6 +141,58 @@ class ExtendedPoemDraft {
     if (value is! String) return null;
     final text = value.trim();
     return text.isEmpty ? null : text;
+  }
+
+  /// 将模型可能返回的整段正文规范化为“一句一项”。
+  ///
+  /// 优先按换行拆分；如果模型把多句合并到同一个数组项（甚至直接返回
+  /// 一个字符串），再按常见中英文句末标点拆分，并保留标点。
+  static List<String>? _parseParagraphs(dynamic raw) {
+    final items = <String>[];
+    if (raw is String) {
+      items.add(raw);
+    } else if (raw is List) {
+      for (final item in raw) {
+        if (item is! String || item.trim().isEmpty) return null;
+        items.add(item);
+      }
+    } else {
+      return null;
+    }
+
+    final paragraphs = <String>[];
+    for (final item in items) {
+      paragraphs.addAll(_splitSentences(item));
+    }
+    return paragraphs.isEmpty ? null : paragraphs;
+  }
+
+  static List<String> _splitSentences(String value) {
+    final result = <String>[];
+    final lines = value.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+    for (final line in lines.split('\n')) {
+      final runes = line.trim().runes.toList();
+      if (runes.isEmpty) continue;
+
+      var current = StringBuffer();
+      for (var index = 0; index < runes.length; index++) {
+        final character = String.fromCharCode(runes[index]);
+        current.write(character);
+        if (!'，。！？；,!?;'.contains(character)) continue;
+
+        // 标点后的引号/括号属于当前句，不单独形成一行。
+        while (index + 1 < runes.length &&
+            '”’）》】〕)]}'.contains(String.fromCharCode(runes[index + 1]))) {
+          index++;
+          current.write(String.fromCharCode(runes[index]));
+        }
+        result.add(current.toString().trim());
+        current = StringBuffer();
+      }
+      final tail = current.toString().trim();
+      if (tail.isNotEmpty) result.add(tail);
+    }
+    return result;
   }
 }
 

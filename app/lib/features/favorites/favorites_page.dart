@@ -46,7 +46,11 @@ class _FavoriteList extends StatelessWidget {
           title: Text(item.poem.displayTitle),
           subtitle: Text('${item.poem.author} · ${item.poem.dynasty}'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push('/poem/${item.poem.id}'),
+          onTap: () => context.push(
+            item.poem.isExtended
+                ? '/extended-poem/${item.poem.id}'
+                : '/poem/${item.poem.id}',
+          ),
         );
       },
     );
@@ -74,8 +78,8 @@ class _EmptyFavorites extends StatelessWidget {
             '读到心动处，点一颗心，\n它会在这里等你。',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

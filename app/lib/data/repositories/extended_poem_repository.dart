@@ -99,7 +99,13 @@ class DriftExtendedPoemRepository implements ExtendedPoemRepository {
   }
 
   @override
-  Future<void> delete(String id) => (_db.delete(
-    _db.extendedPoems,
-  )..where((table) => table.id.equals(id))).go();
+  Future<void> delete(String id) => _db.transaction(() async {
+    // 收藏表同时承载公共和扩展作品 ID；删除扩展作品时清理孤立收藏。
+    await (_db.delete(
+      _db.favorites,
+    )..where((table) => table.poemId.equals(id))).go();
+    await (_db.delete(
+      _db.extendedPoems,
+    )..where((table) => table.id.equals(id))).go();
+  });
 }

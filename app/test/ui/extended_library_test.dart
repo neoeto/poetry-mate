@@ -5,6 +5,8 @@ import 'package:drift/native.dart';
 import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/providers.dart';
 import 'package:poetry_mate/data/repositories/extended_poem_repository.dart';
+import 'package:poetry_mate/data/repositories/favorites_repository.dart';
+import 'package:poetry_mate/data/preferences/reading_prefs.dart';
 import 'package:poetry_mate/domain/entities/extended_poem.dart';
 import 'package:poetry_mate/features/extended/extended_library_page.dart';
 
@@ -67,7 +69,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('delete-extended-poem-ext-demo')));
+    await tester.tap(
+      find.byKey(const ValueKey('delete-extended-poem-ext-demo')),
+    );
     await tester.pumpAndSettle();
     expect(find.text('删除诗词？'), findsOneWidget);
 
@@ -76,5 +80,29 @@ void main() {
 
     expect(find.text('扩展诗词库还空着'), findsOneWidget);
     expect(await DriftExtendedPoemRepository(db).byId(poem.id), isNull);
+  });
+
+  testWidgets('扩展作品阅读页可以收藏', (tester) async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await DriftExtendedPoemRepository(db).save(poem);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appDatabaseProvider.overrideWithValue(db),
+          readingPrefsProvider.overrideWithValue(InMemoryReadingPrefs()),
+        ],
+        child: MaterialApp(home: ExtendedPoemRoutePage(poemId: poem.id)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.favorite_border));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.favorite), findsOneWidget);
+    expect(await DriftFavoritesRepository(db).isFavorite(poem.id), isTrue);
   });
 }

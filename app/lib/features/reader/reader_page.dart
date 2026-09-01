@@ -313,7 +313,10 @@ class _OriginalPoemViewState extends State<_OriginalPoemView> {
           // ── 序文(v1 按正文样式呈现) ──
           if (widget.poem.preface != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(
+                left: widget.bodyStyle.fontSize ?? 24,
+                bottom: 12,
+              ),
               child: Text(
                 widget.renderLine(widget.poem.preface!),
                 style: widget.bodyStyle,
@@ -627,12 +630,12 @@ class _PoemLineState extends State<_PoemLine> {
       button: true,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
-        child: SizedBox(
-          width: double.infinity,
-          child: Text.rich(
+        child: _indentedLine(
+          Text.rich(
             TextSpan(style: widget.style, children: spans),
             textAlign: TextAlign.left,
           ),
+          matches,
         ),
       ),
     );
@@ -648,16 +651,43 @@ class _PoemLineState extends State<_PoemLine> {
           onTap: widget.onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
-            child: SizedBox(
-              width: double.infinity,
-              child: Text(
+            child: _indentedLine(
+              Text(
                 widget.renderLine(widget.originalText),
                 style: widget.style,
                 textAlign: TextAlign.left,
               ),
+              const [],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _indentedLine(Widget text, List<_WordMatch> matches) {
+    final indent = widget.style.fontSize ?? 24;
+    return SizedBox(
+      width: double.infinity,
+      child: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: indent),
+            child: SizedBox(width: double.infinity, child: text),
+          ),
+          if (matches.isNotEmpty)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: indent,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => widget.onWordTap(matches.first.note),
+                child: const SizedBox.expand(),
+              ),
+            ),
+        ],
       ),
     );
   }

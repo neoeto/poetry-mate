@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 import '../../core/db/app_database.dart';
 import '../../domain/entities/favorite_item.dart';
 import '../mappers/poem_mapper.dart';
+import 'extended_poem_repository.dart';
 
 abstract class FavoritesRepository {
   Future<bool> isFavorite(String poemId);
@@ -34,7 +35,9 @@ class DriftFavoritesRepository implements FavoritesRepository {
 
   @override
   Future<void> add(String poemId) async {
-    await _db.into(_db.favorites).insertOnConflictUpdate(
+    await _db
+        .into(_db.favorites)
+        .insertOnConflictUpdate(
           FavoritesCompanion.insert(
             poemId: poemId,
             createdAt: DateTime.now().millisecondsSinceEpoch,
@@ -44,25 +47,37 @@ class DriftFavoritesRepository implements FavoritesRepository {
 
   @override
   Future<void> remove(String poemId) async {
-    await (_db.delete(_db.favorites)..where((t) => t.poemId.equals(poemId)))
-        .go();
+    await (_db.delete(
+      _db.favorites,
+    )..where((t) => t.poemId.equals(poemId))).go();
   }
 
   @override
   Future<List<FavoriteItem>> listByRecent() async {
-    final query = _db.select(_db.favorites).join([
-      innerJoin(_db.poems, _db.poems.id.equalsExp(_db.favorites.poemId)),
-    ])
-      ..orderBy([OrderingTerm.desc(_db.favorites.createdAt)]);
+    // favorites.poemId 兼容公共诗库 ID 和 ext_ 开头的扩展作品 ID；
+    // 因此不能只用 poems 内联表，否则扩展作品会被收藏页过滤掉。
+    final rows = await (_db.select(
+      _db.favorites,
+    )..orderBy([(table) => OrderingTerm.desc(table.createdAt)])).get();
+    final extendedRepository = DriftExtendedPoemRepository(_db);
+    final items = <FavoriteItem>[];
 
-    final rows = await query.get();
-    return rows.map((row) {
-      return FavoriteItem(
-        poem: row.readTable(_db.poems).toEntity(),
-        createdAt: DateTime.fromMillisecondsSinceEpoch(
-            row.readTable(_db.favorites).createdAt),
+    for (final favorite in rows) {
+      final publicQuery = _db.select(_db.poems)
+        ..where((table) => table.id.equals(favorite.poemId));
+      final publicRow = await publicQuery.getSingleOrNull();
+      final poem =
+          publicRow?.toEntity() ??
+          (await extendedRepository.byId(favorite.poemId))?.toPoem();
+      if (poem == null) continue;
+      items.add(
+        FavoriteItem(
+          poem: poem,
+          createdAt: DateTime.fromMillisecondsSinceEpoch(favorite.createdAt),
+        ),
       );
-    }).toList();
+    }
+    return items;
   }
 
   @override

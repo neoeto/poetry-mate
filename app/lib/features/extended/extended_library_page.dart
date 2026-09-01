@@ -151,13 +151,13 @@ class ExtendedPoemRoutePage extends ConsumerWidget {
           : PoemReaderScaffold(
               poem: value.toPoem(),
               sourceInfo: value.sourceInfo,
-              showFavorite: false,
+              showFavorite: true,
               onDelete: () async {
-                await ref
-                    .read(extendedPoemRepositoryProvider)
-                    .delete(value.id);
+                await ref.read(extendedPoemRepositoryProvider).delete(value.id);
                 ref.invalidate(visibleExtendedPoemsProvider);
                 ref.invalidate(extendedPoemByIdProvider(value.id));
+                ref.invalidate(isFavoriteProvider(value.id));
+                ref.invalidate(favoriteItemsProvider);
                 if (context.mounted) {
                   await Navigator.of(context).maybePop();
                 }

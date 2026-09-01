@@ -82,7 +82,8 @@ class PoemFinderService {
           const LlmMessage('assistant', '(上次寻诗结果无法解析)'),
           const LlmMessage(
             'user',
-            '上一次结果不是合法的寻诗 JSON。请重新回答，只输出一个合法 JSON 对象，不能输出原创或仿写文本。',
+            '上一次结果不是合法的寻诗 JSON。请重新回答，只输出一个合法 JSON 对象，不能输出原创或仿写文本；'
+                'paragraphs 必须按原文逐句拆分，每个数组元素只放一句，不能把整首正文合并成一个元素。',
           ),
         ]);
       }
@@ -180,7 +181,7 @@ class PoemFinderService {
   "author": "作者，不确定时为 null",
   "period": "朝代或时期，不确定时为 null",
   "genre": "shi/ci/book_of_songs/prose/modern_poem/other 等",
-  "paragraphs": ["按原文段落逐项填写"],
+  "paragraphs": ["按原文逐句填写，每个数组元素只放一句，保留原有标点和顺序"],
   "preface": null,
   "rhythmic": null,
   "source": "出处，不确定时为 null",
@@ -188,6 +189,7 @@ class PoemFinderService {
   "uncertain_fields": ["author", "period", "source", "text"],
   "recommendation": "为什么适合用户，简短即可"
 }
+每一句必须单独作为 paragraphs 数组中的一个元素；如果原文包含换行或句末标点，请据此拆分，禁止把整首诗词正文作为一个完整字符串返回。
 not_found 时保留 status、reply、message 字段即可。不得将 status=found 与原创文本同时返回。''';
   }
 }

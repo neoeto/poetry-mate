@@ -4,6 +4,7 @@ import 'package:poetry_mate/core/db/app_database.dart';
 import 'package:poetry_mate/data/extended/poem_fingerprint.dart';
 import 'package:poetry_mate/data/mappers/poem_mapper.dart';
 import 'package:poetry_mate/data/repositories/extended_poem_repository.dart';
+import 'package:poetry_mate/data/repositories/favorites_repository.dart';
 import 'package:poetry_mate/data/repositories/poem_catalog_repository.dart';
 import 'package:poetry_mate/data/repositories/poem_repository.dart';
 import 'package:poetry_mate/domain/entities/extended_poem.dart';
@@ -52,13 +53,34 @@ void main() {
     );
   });
 
+  test('寻诗正文按换行和句末标点拆成独立句子', () {
+    final result = AiPoemSearchResponse.tryParse('''
+      {"status":"found","reply":"找到一首","title":"春日",
+      "author":"某作者","period":"近现代","genre":"modern_poem",
+      "paragraphs":["春风从窗前经过。\\n花影落在案头，心事也轻了。"]}
+    ''');
+
+    expect(result?.poem?.paragraphs, ['春风从窗前经过。', '花影落在案头，', '心事也轻了。']);
+  });
+
+  test('寻诗正文也兼容模型返回的单个字符串', () {
+    final result = AiPoemSearchResponse.tryParse('''
+      {"status":"found","reply":"找到一首","title":"春日",
+      "genre":"modern_poem","body":"第一句。第二句！"}
+    ''');
+
+    expect(result?.poem?.paragraphs, ['第一句。', '第二句！']);
+  });
+
   group('扩展作品仓库与跨库去重', () {
     late AppDatabase db;
     late DriftExtendedPoemRepository extended;
+    late DriftFavoritesRepository favorites;
 
     setUp(() {
       db = AppDatabase(NativeDatabase.memory());
       extended = DriftExtendedPoemRepository(db);
+      favorites = DriftFavoritesRepository(db);
     });
 
     tearDown(() => db.close());
@@ -121,7 +143,9 @@ void main() {
           fingerprint: fingerprint,
         ),
       );
-      await db.into(db.poems).insert(
+      await db
+          .into(db.poems)
+          .insert(
             PoemMapper.toCompanion(
               testPoem(id: fingerprint, paragraphs: candidate.paragraphs),
             ),
@@ -153,6 +177,27 @@ void main() {
 
       expect(result.status, ExtendedPoemSaveStatus.alreadyExtended);
       expect(await extended.listByRecent(), hasLength(1));
+    });
+
+    test('扩展作品可以收藏并出现在收藏列表', () async {
+      final candidate = draft();
+      final fingerprint = poemContentFingerprint(candidate.paragraphs);
+      final poem = ExtendedPoem.fromDraft(
+        draft: candidate,
+        id: extendedPoemId(fingerprint),
+        fingerprint: fingerprint,
+      );
+      await extended.save(poem);
+
+      await favorites.add(poem.id);
+      final items = await favorites.listByRecent();
+
+      expect(items, hasLength(1));
+      expect(items.single.poem.id, poem.id);
+      expect(items.single.poem.isExtended, isTrue);
+
+      await extended.delete(poem.id);
+      expect(await favorites.listByRecent(), isEmpty);
     });
   });
 }
